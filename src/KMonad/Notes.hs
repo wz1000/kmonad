@@ -5,9 +5,11 @@ module Notes where
 import KMonad.Prelude
 import KMonad.Util
 
-import Data.Stream
+-- import Data.Stream
 
-type Sausage = Stream
+-- type Sausage = Stream
+
+data Sausage a = Bite a (Sausage a)
 
 data ChunkSize
   = Count Int

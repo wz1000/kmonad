@@ -58,7 +58,6 @@ common shared-props
     , pretty-simple
     , resourcet
     , rio
-    , Stream
     , template-haskell
     , time
     , unliftio

@@ -1,0 +1,8 @@
+#+TITLE: Contributing
+
+* Quick notes
+- Because of how stack handles internal libraries, you will have to complete a
+  `stack build` command before you can run `stack repl`.
+- Make your haddock markup documentation for *users* of the functions. Put notes
+  about implementation details in separate comments that don't get pulled into
+  the haddocks

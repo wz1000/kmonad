@@ -145,3 +145,11 @@ keyKeyAliases = map go $ knLetters <> knNumbers
 --   , ("pad" , ["launchpad", "launch"])
 --   , ("mctl", ["missioncttrl", "mctrl"])
 --   ]
+
+--------------------------------------------------------------------------------
+
+-- | Parse old-style keycode expressions
+--
+-- Deprecated: will be removed in next major version change
+legacyKeycodeP :: Parser Keycode
+legacyKeycodeP = undefined

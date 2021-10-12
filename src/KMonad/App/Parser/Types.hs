@@ -58,6 +58,8 @@ import Text.Megaparsec.Char as X
 --
 -- The basic types of parsing
 
+
+
 -- | Parser's operate on Text and carry no state
 type Parser = Parsec Void Text
 

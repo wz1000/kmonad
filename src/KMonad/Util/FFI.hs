@@ -6,7 +6,7 @@ module KMonad.Util.FFI
   )
 where
 
-import KMonad.Prelude
+import Prelude
 import Foreign.C.Types (CInt)
 
 --------------------------------------------------------------------------------

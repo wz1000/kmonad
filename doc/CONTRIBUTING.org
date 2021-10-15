@@ -6,3 +6,4 @@
 - Make your haddock markup documentation for *users* of the functions. Put notes
   about implementation details in separate comments that don't get pulled into
   the haddocks
+- Disambiguate variables by using a trailing `_`, never export these

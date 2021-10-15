@@ -38,13 +38,6 @@ newtype Keycode = Keycode {unKeycode :: Word32}
 -- In windows, repeat events are signalled by repeated press events. The type is
 -- ordered in a way to line up with the integers Windows uses to encode for
 -- there events. I.e. 0=Press, 1=Release
-data EvType = WindowsPress | WindowsRelease
-  deriving (Eq, Show, Enum)
-
--- | Prism between Linux and Haskell representation of event-types
-_EvType :: Prism' Word8 EvType
-_EvType = prism' (fi . fromEnum) $ \i ->
-  [WindowsPress, WindowsRelease] ^? ix (fi i)
 
 --------------------------------------------------------------------------------
 

@@ -4,16 +4,20 @@ module Prelude
   ( module X
 
   , fi
+  , _fi
   , showHex
   , time0
   )
 where
 
 -- For reexport
-import Control.Lens            as X
-import Control.Lens.Extras     as X
-import Data.Hashable           as X (Hashable(..))
-import Data.Time.Clock.System  as X (SystemTime(..), getSystemTime)
+import Control.Lens           as X
+import Control.Lens.Extras    as X
+import Control.Exception.Lens as X
+import Data.Default           as X
+import Data.Hashable          as X (Hashable(..))
+import Data.Time.Clock.System as X (SystemTime(..), getSystemTime)
+import RIO.Text               as X ( pack, unpack )
 import RIO as X hiding
   (-- Not the lens stuff, I want more support for lenses from "Control.Lens"
     view, ASetter, ASetter', Lens, Getting, Lens'
@@ -41,3 +45,6 @@ showHex = ("0x" <>) . ($ "") . N.showHex
 -- | Used so often a shorthand is nice
 fi :: (Integral a, Num b) => a -> b
 fi = fromIntegral
+
+_fi :: (Integral a, Num b) => Getter a b
+_fi = to fromIntegral

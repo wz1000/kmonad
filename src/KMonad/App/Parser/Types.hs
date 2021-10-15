@@ -58,11 +58,14 @@ import Text.Megaparsec.Char as X
 --
 -- The basic types of parsing
 
+
+
 -- | Parser's operate on Text and carry no state
 type Parser = Parsec Void Text
 
 -- | The type of errors returned by the Megaparsec parsers
 newtype PErrors = PErrors (ParseErrorBundle Text Void)
+  deriving Eq
 
 instance Show PErrors where
   show (PErrors e) = "Parse error at " <> errorBundlePretty e
@@ -128,7 +131,7 @@ data CfgToken = CfgToken
   , _fstL  :: Name         -- ^ Name of initial layer
   , _flt   :: Bool         -- ^ How to deal with unhandled events
   , _allow :: Bool         -- ^ Whether to allow shell commands
-  }
+  } deriving Show
 makeClassy ''CfgToken
 
 

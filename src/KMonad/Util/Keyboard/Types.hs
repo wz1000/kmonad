@@ -136,3 +136,6 @@ type GetKey = OnlyIO KeySwitch
 
 -- | Alias for an action that sends (Switch, Keycode) tuples to the OS.
 type PutKey = KeySwitch -> OnlyIO ()
+
+-- toHex :: Word32 -> String
+-- toHex i = "0x" ++ (map toUpper $ showHex i "")

@@ -15,6 +15,7 @@ module Main
   )
 where
 
+import Prelude (IO)
 import qualified KMonad.App as KMonad (main)
 
 main :: IO ()

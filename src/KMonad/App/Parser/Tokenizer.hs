@@ -59,7 +59,7 @@ parseTokens t = case runParser configP "" t  of
   Right x -> Right x
 
 -- | Load a set of tokens from file, throw an error on parse-fail
-loadTokens :: FilePath -> RIO e [KExpr]
+loadTokens :: (MonadIO m, MonadThrow m) => FilePath -> m [KExpr]
 loadTokens pth = parseTokens <$> readFileUtf8 pth >>= \case
   Left e   -> throwM e
   Right xs -> pure xs
@@ -351,18 +351,22 @@ otokens =
 defcfgP :: Parser DefSettings
 defcfgP = some (lexeme settingP)
 
+-- | All the settable settings in a `defcfg` block
+settings :: [(Text, Parser DefSetting)]
+settings =
+    [ ("input"         , SIToken      <$> itokenP)
+    , ("output"        , SOToken      <$> otokenP)
+    , ("cmp-seq-delay" , SCmpSeqDelay <$> numP)
+    , ("cmp-seq"       , SCmpSeq      <$> buttonP)
+    , ("init"          , SInitStr     <$> textP)
+    , ("fallthrough"   , SFallThrough <$> bool)
+    , ("allow-cmd"     , SAllowCmd    <$> bool)
+    ]
+
 -- | All possible configuration options that can be passed in the defcfg block
 settingP :: Parser DefSetting
-settingP = let f s p = symbol s *> p in
-  (lexeme . choice . map try $
-    [ SIToken      <$> f "input"         itokenP
-    , SOToken      <$> f "output"        otokenP
-    , SCmpSeq      <$> f "cmp-seq"       buttonP
-    , SInitStr     <$> f "init"          textP
-    , SFallThrough <$> f "fallthrough"   bool
-    , SAllowCmd    <$> f "allow-cmd"     bool
-    , SCmpSeqDelay <$> f "cmp-seq-delay" numP
-    ])
+settingP = lexeme . choice . map (\(s, p) -> (try $ symbol s) *> p) $ settings
+
 
 --------------------------------------------------------------------------------
 -- $defalias

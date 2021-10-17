@@ -318,12 +318,68 @@ instance IsKeySwitch WinPacket where
 {- NOTE: Mac -------------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
--- newtype MacKeycode = MacKeycode { _uMacKeycode :: (Word32, Word32) }
+newtype MacKeycode = MacKeycode { _uMacKeycode :: (Word32, Word32) }
 --   deriving (Eq, Ord, Num, Enum, Hashable)
 -- makeLenses ''MacKeycode
 
 {- NOTE: Names -----------------------------------------------------------------
+
+problem statement: we need:
+- to read in keys by their name from config files
+- display keys by their name during logging
+- the keycode-name relationship is different per OS
+- it is hard to figure out the keycodes for certain keys for certain OSes*
+- this mapping needs to be easy to extend and modify for dev-reasons and locales
+
+*: e.g.:
+- what is Windows representation of pushing the Mac 'Fn' key? I don't know how
+  to google this, and I don't have a Mac with windows on it.
+
+solution:
+- we define a collection of 'KeyCongruence's, that define standard names for
+  semantic buttons like 'the `a` key'.
+- create a table of these entries and use that for parsing, pretty-printing, and
+  maybe between-OS-transformation (possible, but why?)
+
+let's not worry about:
+- speed: this is something that happens rarely and pre-app-loop.
+
+
+--------------------------------------------------------------------------------
+
+Now, let's think about the structure of the data:
+- the keyname *must be unique*
+- the description is only used for documentation and logging
+- the codes can have duplicates and missing values*
+
+*: e.g.:
+- windows doesn't distinguish between `ret` and `kpret`, so the semantic buttons
+  'return' and 'keypad return' map to the same keycode in Windows.
+
+--------------------------------------------------------------------------------
+
+Actually... we could move this decision to the edge by making IO:
+
+data Keycode = Literal Word64 | Named NamedKey
+
+sendEvent ::  Keycode -> IO ()
+
+That way we can always invent a `winSendEvent (Named "kpret")` later without
+having to touch any of the other code.
+
+
 -------------------------------------------------------------------------------}
+
+-- | A record describing
+data NamedKey = NamedKey
+  { _keyLin         :: Maybe LinKeycode
+  , _keyMac         :: Maybe MacKeycode
+  , _keyWin         :: Maybe WinKeycode
+  , _keyDescription :: Text
+  , _keyName        :: Text
+  }
+
+newtype KeycodeNames = KeycodeNames { _uKeycodeNames :: [NamedKey] }
 
 
 {- NOTE: IO-types --------------------------------------------------------------

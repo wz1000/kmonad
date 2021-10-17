@@ -8,6 +8,8 @@ where
 
 import Prelude
 
+import RIO (MonadUnliftIO)
+
 import Control.Exception.Lens
 import System.IO.Error.Lens
 

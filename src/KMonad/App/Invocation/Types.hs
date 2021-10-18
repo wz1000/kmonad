@@ -15,6 +15,11 @@ import KMonad.App.Parser --(itokens, keywordButtons, noKeywordButtons, otokens, 
 
 import Options.Applicative
 
+data Task
+  = RunServer
+  | TestConfig FilePath
+  | Discover
+
 
 --------------------------------------------------------------------------------
 -- $cmd
@@ -35,6 +40,9 @@ data Invoc = Invoc
   , _cmpSeq    :: Maybe DefSetting -- ^ Key to use for compose-key sequences
   , _oToken    :: Maybe DefSetting -- ^ How to emit the output
   , _iToken    :: Maybe DefSetting -- ^ How to capture the input
+
+  -- Temporary fix
+  , _discMode  :: Bool -- ^ Whether to run KMonad in discover mode
   }
   deriving Show
 makeClassy ''Invoc

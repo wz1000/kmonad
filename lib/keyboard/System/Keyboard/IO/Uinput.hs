@@ -121,15 +121,15 @@ foreign import ccall "send_event"
 
 c_acquire_uinput_keysink :: CInt -> CString -> CInt -> CInt -> CInt -> IO CInt
 c_acquire_uinput_keysink _ _ _ _ _ =
-  throwIO $ FFIWrongOS "open a uinput sink" "linux"
+  throwIO $ FFIWrongOS "open a uinput sink" Linux
 
 c_release_uinput_keysink :: CInt -> IO Int
 c_release_uinput_keysink _ =
-  throwIO $ FFIWrongOS "release a uinput sink" "linux"
+  throwIO $ FFIWrongOS "release a uinput sink" Linux
 
 c_send_event :: CInt -> CInt -> CInt -> CInt -> CInt -> CInt -> IO CInt
 c_send_event _ _ _ _ _ _ =
-  throwIO $ FFIWrongOS "send an event to a uinput sink" "linux"
+  throwIO $ FFIWrongOS "send an event to a uinput sink" Linux
 
 #endif
 

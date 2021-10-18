@@ -36,4 +36,7 @@ import RIO as X hiding
     -- Hiding these because I want to rename IO to OnlyIO to be more explicit
   , IO
 
+    -- This is causing errors for some reason:
+  , catchIO
+
   )

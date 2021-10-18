@@ -17,11 +17,15 @@ module System.Keyboard.Types where
 
 import Prelude
 
+import Data.Bits
 import Foreign.Storable
+
+import GHC.Enum (Enum(..))
 
 {- NOTE: Basic -}
 
-type Name = Text
+type Name    = Text
+type Keyname = Text
 
 {- NOTE: Generic ---------------------------------------------------------------
 The central aim of this library is to provide OS-agnostic representation and
@@ -61,13 +65,13 @@ class HasSwitch a where switch :: Lens' a Switch
 instance HasSwitch Switch where switch = id
 
 instance Hashable Switch where
-  hashWithSalt n = hashWithSalt n . (Press ==)
+  hashWithSalt s = hashWithSalt s . (Press ==)
 
 {- NOTE: Keycode --------------------------------------------------------------}
 
 -- | The 'Keycode' type
 newtype Keycode = Keycode { _uKeycode :: Word64 }
-  deriving (Eq, Ord, Num, Enum, Hashable)
+  deriving (Eq, Ord, Enum, Hashable)
 makeLenses ''Keycode
 
 instance Show Keycode where show = showHex . _uKeycode
@@ -168,7 +172,7 @@ Linux event packet:
 
 -- | A keycode by/for Linux
 newtype LinKeycode = LinKeycode { _uLinKeycode :: Word16 }
-  deriving (Eq, Ord, Num, Enum, Hashable)
+  deriving (Eq, Ord, Enum, Hashable)
 makeLenses ''LinKeycode
 
 instance Show LinKeycode where show = showHex . _uLinKeycode
@@ -277,7 +281,7 @@ have key presses and releases, so we do not have to represent some intermediate
 
 -- | In Windows we use 'Word32', the windows-native keycode type
 newtype WinKeycode = WinKeycode { _uWinKeycode :: Word32 }
-  deriving (Eq, Ord, Num, Enum, Hashable)
+  deriving (Eq, Ord, Enum, Hashable)
 makeLenses ''WinKeycode
 
 instance IsKeycode WinKeycode where
@@ -318,9 +322,44 @@ instance IsKeySwitch WinPacket where
 {- NOTE: Mac -------------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
+
+{- NOTE: MacKeycode -----------------------------------------------------------}
+
+-- TODO: Write a better Show for mac
 newtype MacKeycode = MacKeycode { _uMacKeycode :: (Word32, Word32) }
---   deriving (Eq, Ord, Num, Enum, Hashable)
--- makeLenses ''MacKeycode
+  deriving (Eq, Ord, Show)
+makeLenses ''MacKeycode
+
+instance Hashable MacKeycode where
+  hashWithSalt s = hashWithSalt s . view _Keycode
+
+instance IsKeycode MacKeycode where
+  _Keycode = iso
+    (Keycode    . (\(a, b) -> shiftL (fi a) 32 + (fi b)) . _uMacKeycode)
+    (MacKeycode . (\c      -> (fi $ shiftR c 32, fi c))  . _uKeycode)
+
+instance Enum MacKeycode where
+  toEnum   = view (from _Keycode) . toEnum
+  fromEnum = fromEnum . view _Keycode
+
+{- NOTE: MacPacket ------------------------------------------------------------}
+data MacPacket = MacPacket
+  { _macVal  :: Word64
+  , _macCode :: (Word32, Word32)
+  } deriving (Eq, Ord, Show)
+
+instance Storable MacPacket where
+  alignment _ = 4
+  sizeOf    _ = 16
+  peek ptr = do
+    s <- peekByteOff ptr 0
+    p <- peekByteOff ptr 8
+    u <- peekByteOff ptr 12
+    return $ MacPacket s (p, u)
+  poke ptr (MacPacket s (p, u)) = do
+    pokeByteOff ptr 0 s
+    pokeByteOff ptr 8 p
+    pokeByteOff ptr 12 u
 
 {- NOTE: Names -----------------------------------------------------------------
 
@@ -370,38 +409,47 @@ having to touch any of the other code.
 
 -------------------------------------------------------------------------------}
 
+-- | A key is identified by either its name or some literal keycode.
+data KeyId
+  = NamedKey   Keyname
+  | LiteralKey Keycode
+
 -- | A record describing
-data NamedKey = NamedKey
-  { _keyLin         :: Maybe LinKeycode
+data KeyCongruence = KeyCongruence
+  { _keyName        :: Keyname
+  , _keyDescription :: Text
+  , _keyLin         :: Maybe LinKeycode
   , _keyMac         :: Maybe MacKeycode
   , _keyWin         :: Maybe WinKeycode
-  , _keyDescription :: Text
-  , _keyName        :: Text
-  }
+  } deriving Show
 
-newtype KeycodeNames = KeycodeNames { _uKeycodeNames :: [NamedKey] }
+newtype KeyTable = KeyTable { _uKeyTable :: [KeyCongruence] }
+  deriving Show
+
 
 
 {- NOTE: IO-types --------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
-type Operation = Text
-type OSName    = Text
+type Description = Text
+
+data OS = Linux | Mac | Windows deriving (Eq, Ord, Show)
+
 
 -- NOTE This shouldn't live here
-currentOS :: OSName
+currentOS :: OS
 #if defined linux_HOST_OS
-currentOS = "linux"
-#elif defined mingw32_HOST_OS
-currentOS = "windows"
+currentOS = Linux
 #elif defined darwin_HOST_OS
-currentOS = "mac"
+currentOS = Mac
+#elif defined mingw32_HOST_OS
+currentOS = Windows
 #endif
 
-data OSException = FFIWrongOS Operation OSName
+data OSException = FFIWrongOS Description OS
   deriving Show
 
 instance Exception OSException where
   displayException (FFIWrongOS action target) = unpack . mconcat $
-    [ "Tried to '", action, "' on <", currentOS
-    , ">. But this is only supported on <", target, ">" ]
+    [ "Tried to '", action, "' on <", tshow currentOS
+    , ">. But this is only supported on <", tshow target, ">" ]

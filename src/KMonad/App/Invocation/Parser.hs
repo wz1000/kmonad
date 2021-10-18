@@ -35,6 +35,7 @@ invocP = Invoc
   <*> cmpSeqP
   <*> oTokenP
   <*> iTokenP
+  <*> expModeP
 
 -- | Parse a filename that points us at the config-file
 fileP :: Parser FilePath
@@ -124,6 +125,13 @@ startDelayP = option (fromIntegral <$> megaReadM numP)
   <> showDefaultWith (\a -> show $ (fromIntegral a :: Int))
   <> help  "How many ms to wait before grabbing the input keyboard (time to release enter if launching from terminal)")
 
+-- | Experimental flag to trigger discover-mode.
+--
+-- TODO: turn this into a proper subcommand
+--
+expModeP :: Parser Bool
+expModeP = flag False True
+  ( long  "discover" <> short 'q' <> help "Run discover mode")
 -- | Transform a bunch of tokens of the form @(Keyword, Parser)@ into an
 -- optparse-applicative parser
 tokenParser :: [(Text, P.Parser a)] -> ReadM a

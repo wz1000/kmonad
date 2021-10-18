@@ -112,5 +112,12 @@ run c = do
   let logcfg = LogCfg (c^.logLvl) stdout Nothing
 
   runLog logcfg $ do
-    cfg <- loadConfig (c^.cfgFile) c -- Load cfg-file and overwrite Invoc settings
-    unless (c^.dryRun) $ startApp cfg
+    logInfo $ tshow c
+    if c^.discMode
+      then runDiscover
+      else  do
+        cfg <- loadConfig (c^.cfgFile) c -- Load cfg-file and overwrite Invoc settings
+        unless (c^.dryRun) $ startApp cfg
+
+runDiscover :: OnlyLIO ()
+runDiscover = logDebug "hello"

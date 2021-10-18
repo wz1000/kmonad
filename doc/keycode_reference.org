@@ -90,10 +90,10 @@ in this table, this keycode occurs in this table.
 | /    |  53 | (0x7, 0x38) | 0xBF | / or ?                        |
 | spc  |  57 | (0x7, 0x2C) | 0x20 | Spacebar                      |
 | 102d |  86 | (0x7, 0x64) | 0xE2 | Key between lsft and z on ISO |
-| sys  |  99 | (0x7, 0x46) | 0x2C | SysRq/Print Screen              |
-| paus | 119 | (0x7, 0x48) | 0x13 | Pause/Break                     |
-| ins  | 110 | (0x7, 0x49) | 0x2D | Insert                          |
-| del  | 111 | (0x7, 0x4C) | 0x2E | Delete                          |
+| sys  |  99 | (0x7, 0x46) | 0x2C | SysRq/Print Screen            |
+| paus | 119 | (0x7, 0x48) | 0x13 | Pause/Break                   |
+| ins  | 110 | (0x7, 0x49) | 0x2D | Insert                        |
+| del  | 111 | (0x7, 0x4C) | 0x2E | Delete                        |
 
 *** Movement and navigation
 |------+-----+-------------+------+-------------|

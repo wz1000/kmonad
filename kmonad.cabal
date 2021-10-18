@@ -67,6 +67,15 @@ common shared-props
   default-language: Haskell2010
 
 library keyboard
+  default-extensions:
+      GeneralizedNewtypeDeriving
+      MultiWayIf
+      NoImplicitPrelude
+      OverloadedStrings
+      TemplateHaskell
+  other-modules:
+    Prelude
+    System.Keyboard.Types
   exposed-modules:
     System.Keyboard
     System.Keyboard.IO

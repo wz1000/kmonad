@@ -43,10 +43,3 @@ lookupKeyname t n = grab =<< lookupKeyname' t n
                                    Windows -> k^?keyWin._Just._Keycode
 
 
-ppKeyCongruence :: KeyCongruence -> Text
-ppKeyCongruence k = mconcat
-  [ "Name: '", k^.keyName, "' description: '", k^.keyDescription, "'\n"
-  , "Linux: ",    maybe "~" tshow (k^?keyLin._Just._Keycode)
-  , " Mac: ",     maybe "~" tshow (k^?keyMac._Just._Keycode)
-  , " Windows: ", maybe "~" tshow (k^?keyWin._Just._Keycode)
-  ]

@@ -15,7 +15,6 @@ module System.Keyboard.IO.Uinput
   , uinputWriteLow
   , uinputWrite
   , uinputRepeat
-  , withUinput
   )
 where
 
@@ -35,7 +34,7 @@ import System.Posix
 The configuration and environment settings for a Uinput sink.
 -------------------------------------------------------------------------------}
 
--- | Configuration of the Uinput keyboard to instantiate
+-- | Configuration for uinput keysink in Linux
 data UinputCfg = UinputCfg
   { _vendorCode     :: !Int  -- ^ USB vendor code of the generated keyboard
   , _productCode    :: !Int  -- ^ USB product code of the generated keyboard
@@ -192,5 +191,13 @@ uinputRepeat c = do
   uinputWriteLow . LowLinSyncEvent   $ mkLinSyncEvent
 
 -- | Run some function in the context of an open uinput device.
-withUinput :: MonadUnliftIO m => UinputCfg -> (UinputEnv -> m a) -> m a
-withUinput cfg = bracket (liftIO $ openUinput cfg) (liftIO . closeUinput)
+withUinput :: MonadUnliftIO m => UinputCfg -> (KeyO -> m a) -> m a
+withUinput cfg f =
+  bracket
+  (liftIO $ openUinput cfg)
+  (liftIO . closeUinput)
+  (\env -> f (KeyO (runRIO env . uinputWrite) (runRIO env . uinputRepeat)))
+
+instance CanOpenKeyO UinputCfg where
+  withKeyO = withUinput
+

@@ -11,14 +11,6 @@ import Foreign.Ptr
 import Foreign.Marshal hiding (void)
 import Foreign.Storable
 
--- | The configuration options that can be passed to IOKitCfg.
-newtype IOKitCfg = IOKitCfg
-  { _productStr :: Maybe Text -- ^ A string to restrict which keyboard to capture
-  } deriving Show
-makeClassy ''IOKitCfg
-
-instance Default IOKitCfg where def = IOKitCfg Nothing
-
 -- | The runtime environment for IOKit computations.
 newtype IOKitEnv = IOKitEnv
 

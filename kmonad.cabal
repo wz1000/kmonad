@@ -68,20 +68,34 @@ common shared-props
 
 library keyboard
   default-extensions:
+      ConstraintKinds
       GeneralizedNewtypeDeriving
+      LambdaCase
       MultiWayIf
       NoImplicitPrelude
       OverloadedStrings
       TemplateHaskell
+      TupleSections
   other-modules:
     Prelude
+    System.Keyboard.Operations
     System.Keyboard.Types
+    System.Keyboard.IO.Evdev
+    System.Keyboard.IO.Uinput
+    System.Keyboard.IO.General
+    Util.FFI
   exposed-modules:
     System.Keyboard
     System.Keyboard.IO
-  build-depends: base, data-default, hashable, lens, rio, time
+  build-depends: base, cereal, data-default, hashable, lens, rio, time
   hs-source-dirs: lib/keyboard
   default-language: Haskell2010
+  -- Linux block
+  if os(linux)
+    c-sources:
+      c_src/keyio.c
+    build-depends:
+      unix
 
 library
   import: shared-props
@@ -94,6 +108,7 @@ library
   exposed-modules:
       KMonad.App
       KMonad.App.Main
+      KMonad.App.Main.Discover
       KMonad.App.Main.OS
       KMonad.App.Main.Run
       KMonad.App.Main.Loop

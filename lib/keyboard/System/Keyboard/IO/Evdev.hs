@@ -44,8 +44,13 @@ makeClassy ''EvdevCfg
 data EvdevEnv = EvdevEnv
   { _cfg :: EvdevCfg -- ^ The 'EvdevCfg' with which this env was started
   , _fd  :: CInt     -- ^ Open file-descriptor to the Evdev keyboard
+  , _h   :: Handle   -- ^ Haskell file handle to the same file
   }
 makeClassy ''EvdevEnv
+
+-- NOTE: `fd` and `h` point to the same file. I thought to refactor this and
+-- only hold 1 reference, and only reconsruct `h` when I needed to from `fd`.
+-- THIS BREAKS EVERYTHING AND SHOULD NOT BE DONE.
 
 instance HasEvdevCfg EvdevEnv where evdevCfg = cfg
 
@@ -110,8 +115,9 @@ openEvdev :: EvdevCfg -> IO EvdevEnv
 openEvdev cfg = do
   let flags = OpenFileFlags False False False False False
   (Fd fd_) <- openFd (cfg^.evdevPath) ReadOnly Nothing flags
+  h        <- fdToHandle (Fd fd_)
   c_ioctl_keyboard fd_ 1 `onNonZeroThrow` (_EvdevCouldNotAcquire, cfg)
-  pure $ EvdevEnv cfg fd_
+  pure $ EvdevEnv cfg fd_ h
 
 -- | Execute an ioctl release and close a device file
 closeEvdev :: EvdevEnv -> IO ()
@@ -125,7 +131,8 @@ closeEvdev env = c_ioctl_keyboard (env^.fd) 0
 -- | Return the first 'LowLinEvent' from an open device file
 evdevReadLow :: CanEvdev m env => m LowLinEvent
 evdevReadLow = view evdevEnv >>= \env -> liftIO $ do
-  bytes <- (`B.hGet` 24) =<< fdToHandle (Fd $ env^.fd)
+
+  bytes <- B.hGet (env^.h) 24
   case B.decode . B.reverse $ bytes of
     Left s            -> throwing _EvdevCouldNotDecode (env^.cfg, s)
     Right (a,b,c,d,e) -> pure $ (LinPacket e d c b a)^.re _LinPacket
@@ -136,6 +143,18 @@ evdevRead = evdevReadLow >>= \case
   LowLinKeyEvent e -> pure $ mkKeySwitch (e^.switch) (e^.keycode)
   _                -> evdevRead
 
+-- | Run some function in the context of an acquired evdev keyboard.
+--
+-- Use this if you want access to all of the events thrown by a linux keyboard
+-- event file. Use 'withEvdev' if you want only key press and release events.
+-- This context is a little bit less fleshed out than 'withEvdev', and you will
+-- have to embed the environment and deal with the 'LowLinEvent's yourself.
+withEvdevEnv :: MonadUnliftIO m => EvdevCfg -> (EvdevEnv -> m a) -> m a
+withEvdevEnv cfg = bracket (liftIO $ openEvdev cfg) (liftIO . closeEvdev)
+
 -- | Run some function in the context of an acquired device file
-withEvdev :: MonadUnliftIO m => EvdevCfg -> (EvdevEnv -> m a) -> m a
-withEvdev cfg = bracket (liftIO $ openEvdev cfg) (liftIO . closeEvdev)
+withEvdev :: MonadUnliftIO m => EvdevCfg -> (KeyI -> m a) -> m a
+withEvdev cfg f = withEvdevEnv cfg $ \env -> f (KeyI (runRIO env evdevRead))
+
+
+instance CanOpenKeyI EvdevCfg where withKeyI = withEvdev

@@ -16,6 +16,8 @@ import KMonad.Model hiding (withModel) -- FIXME: change when pullchain is factor
 import KMonad.Util hiding (logLvl)
 import KMonad.Pullchain.IO
 
+import KMonad.App.Main.Discover
+
 import qualified RIO.Text.Lazy as T
 
 -- TODO: Fix bad naming of loglevel clashing between Cmd and Logging
@@ -112,12 +114,16 @@ run c = do
   let logcfg = LogCfg (c^.logLvl) stdout Nothing
 
   runLog logcfg $ do
-    logInfo $ tshow c
     if c^.discMode
       then runDiscover
       else  do
         cfg <- loadConfig (c^.cfgFile) c -- Load cfg-file and overwrite Invoc settings
         unless (c^.dryRun) $ startApp cfg
 
-runDiscover :: OnlyLIO ()
-runDiscover = logDebug "hello"
+newtype Socket m a = Socket { _uSocket :: ( a -> m (), m a ) }
+type KeySocket m = Socket m KeySwitch
+
+data KioCfg = LinCfg | WinCfg | MacCfg
+
+-- withKeyIO :: MonadUnliftIO m => KioCfg -> (KeySocket m -> m a) -> m a
+-- withKeyIO = undefined

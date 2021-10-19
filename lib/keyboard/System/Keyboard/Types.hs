@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-
 Place the following here:
 
@@ -24,8 +25,10 @@ import GHC.Enum (Enum(..))
 
 {- NOTE: Basic -}
 
-type Name    = Text
-type Keyname = Text
+-- Text disambiguations
+type Description = Text
+type Name        = Text
+type Keyname     = Text
 
 {- NOTE: Generic ---------------------------------------------------------------
 The central aim of this library is to provide OS-agnostic representation and
@@ -71,7 +74,7 @@ instance Hashable Switch where
 
 -- | The 'Keycode' type
 newtype Keycode = Keycode { _uKeycode :: Word64 }
-  deriving (Eq, Ord, Enum, Hashable)
+  deriving (Eq, Ord, Enum, Num, Hashable)
 makeLenses ''Keycode
 
 instance Show Keycode where show = showHex . _uKeycode
@@ -104,7 +107,7 @@ instance IsKeycode Keycode where _Keycode = id
 
 -- | The 'KeySwitch' type describing a state-change of some key
 newtype KeySwitch = KeySwitch { _uKeySwitch :: (Switch, Keycode) }
-  deriving (Eq, Ord, Hashable)
+  deriving (Eq, Ord, Hashable, Show)
 makeLenses ''KeySwitch
 
 instance HasSwitch  KeySwitch where switch  = uKeySwitch . _1
@@ -210,7 +213,7 @@ instance HasLinPacket LinKeyEvent where linPacket = uLinKeyEvent
 
 instance HasSwitch LinKeyEvent where
   switch = lens
-    (\l   -> bool Press Release (l^.linVal == 1))
+    (\l   -> bool Release Press (l^.linVal == 1))
     (\l s -> l & linVal .~ (if s^._IsPress then 1 else 0))
 
 instance HasKeycode LinKeyEvent where
@@ -243,6 +246,13 @@ makeLenses ''LinSyncEvent
 
 instance HasLinPacket LinSyncEvent where linPacket = uLinSyncEvent
 
+-- | A packet of serializeable data representing a linux sync event
+newtype LinScanEvent = LinScanEvent { _uLinScanEvent :: LinPacket }
+  deriving (Show, Eq)
+makeLenses ''LinScanEvent
+
+instance HasLinPacket LinScanEvent where linPacket = uLinScanEvent
+
 -- | Smart constructor for 'LinSyncEvent's
 mkLinSyncEvent :: LinSyncEvent
 mkLinSyncEvent = LinSyncEvent $ LinPacket 0 0 0 0 0
@@ -253,6 +263,7 @@ mkLinSyncEvent = LinSyncEvent $ LinPacket 0 0 0 0 0
 data LowLinEvent
   = LowLinKeyEvent    LinKeyEvent
   | LowLinRepeatEvent LinRepeatEvent
+  | LowLinScanEvent   LinScanEvent
   | LowLinSyncEvent   LinSyncEvent
   deriving (Show)
 
@@ -264,9 +275,11 @@ instance IsLinPacket LowLinEvent where
       to_ (LowLinKeyEvent e)    = e^.linPacket
       to_ (LowLinRepeatEvent e) = e^.linPacket
       to_ (LowLinSyncEvent e)   = e^.linPacket
+      to_ (LowLinScanEvent e)   = e^.linPacket
       from_ p = if
         | p^.linType == 0 -> LowLinSyncEvent   . LinSyncEvent   $ p
         | p^.linVal  == 2 -> LowLinRepeatEvent . LinRepeatEvent $ p
+        | p^.linType == 4 -> LowLinScanEvent   . LinScanEvent   $ p
         | otherwise       -> LowLinKeyEvent    . LinKeyEvent    $ p
 
 instance HasLinPacket LowLinEvent where
@@ -361,6 +374,83 @@ instance Storable MacPacket where
     pokeByteOff ptr 8 p
     pokeByteOff ptr 12 u
 
+{- NOTE: OS-support types ------------------------------------------------------
+Much of this library is OS-specific code. We would like to provide an
+OS-agnostic interface to this code. That is why we gather the different
+configurations into the following sum-types.
+-------------------------------------------------------------------------------}
+
+{- NOTE: Informative OS error -------------------------------------------------}
+
+data OS = Linux | Mac | Windows deriving (Eq, Ord, Show)
+
+-- | The OS under which we are compiled
+currentOS :: OS
+#if defined linux_HOST_OS
+currentOS = Linux
+#elif defined darwin_HOST_OS
+currentOS = Mac
+#elif defined mingw32_HOST_OS
+currentOS = Windows
+#endif
+
+data OSException = FFIWrongOS Description OS
+  deriving Show
+
+instance Exception OSException where
+  displayException (FFIWrongOS action target) = unpack . mconcat $
+    [ "Tried to '", action, "' on <", tshow currentOS
+    , ">. But this is only supported on <", tshow target, ">" ]
+
+{- NOTE: Config sumtypes ------------------------------------------------------}
+
+
+-- | Configuration for (k/d)ext keysink in Mac
+--
+-- Note that Mac has no configuration options,, but we maintain this type for
+-- symmetry and ease of future extension.
+data ExtCfg = ExtCfg deriving (Eq, Show)
+
+instance Default ExtCfg where def = ExtCfg
+
+{- NOTE: General output types -------------------------------------------------}
+
+-- | A token hiding all the functionality required to put keys into the OS
+data KeyO = KeyO
+  { _emitKey   :: KeySwitch -> IO () -- ^ How to emit a switch event to OS
+  , _repeatKey :: Keycode   -> IO () -- ^ How to signal OS to repeat a keyswitch
+  }
+makeLenses ''KeyO
+
+-- | A class generalizing the concept of some config that allows opening a key sink
+class CanOpenKeyO cfg where
+  withKeyO :: forall m a. MonadUnliftIO m => cfg -> (KeyO -> m a) -> m a
+
+-- | An existential wrapper hiding the concrete type of the output configuration
+-- NOTE: do I need this?
+data KeyOCfg = forall cfg. CanOpenKeyO cfg => KeyOCfg cfg
+-- | How to auto-unwrap the wrapper
+instance CanOpenKeyO KeyOCfg where withKeyO (KeyOCfg cfg) = withKeyO cfg
+
+class HasKeyO env where keyO :: Getter env KeyO
+
+type CanKeyO m env = (MonadIO m, MonadReader env m, HasKeyO env)
+
+
+
+{- NOTE: General input types --------------------------------------------------}
+
+-- | A token hiding all the functionality required to get keys from the OS
+newtype KeyI = KeyI { _uKeyI :: IO KeySwitch }
+makeLenses ''KeyI
+
+class CanOpenKeyI cfg where
+  withKeyI :: forall m a. MonadUnliftIO m => cfg -> (KeyI -> m a) -> m a
+
+class HasKeyI env where keyI :: Getter env KeyI
+instance HasKeyI KeyI where keyI = id
+
+
 {- NOTE: Names -----------------------------------------------------------------
 
 problem statement: we need:
@@ -422,34 +512,48 @@ data KeyCongruence = KeyCongruence
   , _keyMac         :: Maybe MacKeycode
   , _keyWin         :: Maybe WinKeycode
   } deriving Show
+makeLenses ''KeyCongruence
 
 newtype KeyTable = KeyTable { _uKeyTable :: [KeyCongruence] }
   deriving Show
 
+{- NOTE: Key-repeat types ------------------------------------------------------
+-------------------------------------------------------------------------------}
+
+-- | Settings that describe how to trigger key-repeat events
+data KeyRepeatCfg = KeyRepeatCfg
+  { _repeatDelay :: Int -- ^ How many milliseconds before we start repeating
+  , _repeatRate  :: Int -- ^ How many milliseconds between repeat events
+  } deriving (Eq, Show)
+makeLenses ''KeyRepeatCfg
+
+-- | Runtime environment for the key-repeat process
+data KeyRepeatEnv = KeyRepeatEnv
+  { _repeatCfg :: KeyRepeatCfg
+  , _current   :: MVar (Maybe (Async ()))
+  , _krKeyO      :: KeyO
+  }
+makeLenses ''KeyRepeatEnv
+
+instance HasKeyO KeyRepeatEnv where keyO = krKeyO
 
 
 {- NOTE: IO-types --------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
-type Description = Text
+-- | A token containing all the functionality required to key keys from the OS
+newtype KeyGetter = KeyGetter { _uKeyGetter :: IO KeySwitch }
+makeLenses ''KeyGetter
 
-data OS = Linux | Mac | Windows deriving (Eq, Ord, Show)
+-- class HasKeyGetter a where keyGetter :: Getter a KeyGetter
+-- class HasKeyPutter a where keyPutter :: Getter a KeyO
 
+  -- , _repeatCfg :: Maybe KeyRepeatCfg -- ^ Key-repeat settings
 
--- NOTE This shouldn't live here
-currentOS :: OS
-#if defined linux_HOST_OS
-currentOS = Linux
-#elif defined darwin_HOST_OS
-currentOS = Mac
-#elif defined mingw32_HOST_OS
-currentOS = Windows
-#endif
+-- | The configuration options that can be passed to IOKitCfg.
+newtype IOKitCfg = IOKitCfg
+  { _productStr :: Maybe Text -- ^ A string to restrict which keyboard to capture
+  } deriving Show
+makeClassy ''IOKitCfg
 
-data OSException = FFIWrongOS Description OS
-  deriving Show
-
-instance Exception OSException where
-  displayException (FFIWrongOS action target) = unpack . mconcat $
-    [ "Tried to '", action, "' on <", tshow currentOS
-    , ">. But this is only supported on <", tshow target, ">" ]
+instance Default IOKitCfg where def = IOKitCfg Nothing

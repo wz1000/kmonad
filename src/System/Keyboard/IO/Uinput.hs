@@ -191,13 +191,12 @@ uinputRepeat c = do
   uinputWriteLow . LowLinSyncEvent   $ mkLinSyncEvent
 
 -- | Run some function in the context of an open uinput device.
-withUinput :: MonadUnliftIO m => UinputCfg -> (KeyO -> m a) -> m a
+withUinput :: MonadUnliftIO m => UinputCfg -> (BasicKeyO -> m a) -> m a
 withUinput cfg f =
   bracket
   (liftIO $ openUinput cfg)
   (liftIO . closeUinput)
-  (\env -> f (KeyO (runRIO env . uinputWrite) (runRIO env . uinputRepeat)))
+  (\env -> f (BasicKeyO (runRIO env . uinputWrite) (runRIO env . uinputRepeat)))
 
-instance CanOpenKeyO UinputCfg where
-  withKeyO = withUinput
-
+instance CanOpenBasicKeyO UinputCfg where
+  withBasicKeyO = withUinput

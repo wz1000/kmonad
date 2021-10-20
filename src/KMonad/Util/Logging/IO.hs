@@ -1,7 +1,7 @@
 module KMonad.Util.Logging.IO
   ( -- * $run
-    withLog
-  , runLog
+    withLogging
+  , runLogging
 
     -- * $log
   , logError, logWarn, logInfo, logDebug
@@ -20,17 +20,17 @@ import qualified RIO as R
 --------------------------------------------------------------------------------
 -- $run
 
--- | Use 'LogCfg' to run a context-continuation
-withLog :: UIO m => LogCfg -> Ctx r m LogEnv
-withLog c = mkCtx $ \f -> do
+-- | Use 'LogCfg' to run a function in the context of an acquired logger
+withLogging :: UIO m => LogCfg -> (LogEnv -> m a) -> m a
+withLogging c f = do
   -- Default to non-verbose logging
   raw <- logOptionsHandle (c^.logTgt) False
   let ops = raw & setLogMinLevel (c^.logLvl)
   withLogFunc ops $ f . LogEnv c
 
 -- | Run an Only-LogEnv RIO action in a UIO
-runLog :: UIO m => LogCfg -> OnlyLIO a -> m a
-runLog c = runCtx (withLog c) . inEnv
+runLogging :: UIO m => LogCfg -> OnlyLIO a -> m a
+runLogging c = (withLogging c) . inEnv
 
 
 --------------------------------------------------------------------------------
@@ -61,10 +61,15 @@ dspWarn  = logWarn  . textDisplay
 dspInfo  = logInfo  . textDisplay
 dspDebug = logDebug . textDisplay
 
+-- | Utility functio nto create the other seperator functions
+doSep :: (LIO m e) => (Text -> m ()) -> m ()
+doSep f = view (logEnv.logCfg.logSep) >>= \case
+  (LogSep Nothing)  -> pure ()
+  (LogSep (Just t)) -> f t
+
 -- | Functions to write separators to the log.
 sepError, sepWarn, sepInfo, sepDebug :: (LIO m e) => m ()
-sepError = traverse_ logError =<< view logSep
-sepWarn  = traverse_ logWarn  =<< view logSep
-sepInfo  = traverse_ logInfo  =<< view logSep
-sepDebug = traverse_ logDebug =<< view logSep
-
+sepError = doSep logError
+sepWarn  = doSep logWarn
+sepInfo  = doSep logInfo
+sepDebug = doSep logDebug

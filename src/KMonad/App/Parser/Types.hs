@@ -42,14 +42,16 @@ module KMonad.App.Parser.Types
 
 
 import KMonad.Prelude
-import KMonad.App.KeyIO
+-- import KMonad.App.KeyIO
 import KMonad.App.Types
 import KMonad.Model.Types
 import KMonad.Pullchain.Button
 import KMonad.Pullchain.Types
-import KMonad.Util.Keyboard
+-- import KMonad.Util.Keyboard
 -- import KMonad.Keyboard.IO
-import KMonad.Util
+import KMonad.Util hiding (Keycode)
+
+import System.Keyboard hiding (Name)
 
 import Text.Megaparsec      as X
 import Text.Megaparsec.Char as X
@@ -126,8 +128,8 @@ data DefButton
 -- | The 'CfgToken' contains all the data needed to construct an
 -- 'KMonad.App.AppCfg'.
 data CfgToken = CfgToken
-  { _src   :: KeyInputCfg  -- ^ How to grab the source keyboard
-  , _snk   :: KeyOutputCfg -- ^ How to construct the out keybboard
+  { _src   :: InputCfg  -- ^ How to grab the source keyboard
+  , _snk   :: OutputCfg -- ^ How to construct the out keybboard
   , _km    :: Keymap BCfg  -- ^ A collection of layers of button configurations
   , _fstL  :: Name         -- ^ Name of initial layer
   , _flt   :: Bool         -- ^ How to deal with unhandled events

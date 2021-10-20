@@ -75,67 +75,13 @@ import RIO.FilePath
 
 --------------------------------------------------------------------------------
 
-{- NOTE: KeyIO tokens ---------------------------------------------------------}
-
--- | All available methods of capturing keyboards
-data InputToken
-  = Evdev (Maybe FilePath) -- ^ Linux evdev source with optional FilePath to device
-  | LLHook                 -- ^ Windows low-level keyboard hook
-  | IOKit (Maybe Text)     -- ^ Mac IOKit source with optional keyboard subset
-  deriving (Eq, Show)
-makeClassyPrisms ''InputToken
-
-instance Default InputToken where
-#if defined linux_HOST_OS
-  def = Evdev Nothing
-#elif defined darwin_HOST_OS
-  def = IOKit Nothing
-#elif defined mingw32_HOST_OS
-  def = LLHook
-#endif
-
--- | Full configuration describing how to acquire a keyboard
-data InputCfg = InputCfg
-  { _inputToken :: InputToken -- ^ Token describing how to acquire the keyboard
-  , _startDelay :: Ms         -- ^ How long to wait before acquiring input keyboard
-  } deriving (Eq, Show)
-makeClassy ''InputCfg
-
-instance Default InputCfg where
-  def = InputCfg def 200
-
--- | All available methods of simulating keyboards
-data OutputToken
-  = Uinput (Maybe Text) (Maybe Text) -- ^ Linux uinput with a name and optional cmd
-  | SendKeys                         -- ^ Windows @SendKeys@ based event injector
-  | Ext                              -- ^ Mac dext/kext based event injector
-  deriving (Eq, Show)
-makeClassyPrisms ''OutputToken
-
-instance Default OutputToken where
-#if defined linux_HOST_OS
-  def = Uinput (Just "KMonad simulated keyboard") Nothing
-#elif defined darwin_HOST_OS
-  def = Ext
-#elif defined mingw32_HOST_OS
-  def = SendKeys
-#endif
-
--- | Full configuration describing how to simulate a keyboard
-data OutputCfg = OutputCfg
-  { _outputToken  :: OutputToken
-  , _mayRepeatCfg :: KeyRepeatCfg
-  } deriving (Eq, Show)
-makeClassy ''OutputCfg
-
-instance Default OutputCfg where
-  def = OutputCfg def def
+{- NOTE: Different cfgs -------------------------------------------------------}
 
 -- | Configuration options that are required for everything in KMonad
 data GlobalCfg = GlobalCfg
-  { _logLevel    :: LogLevel  -- ^ Logging level
-  , _logSections :: Bool      -- ^ Used to enable section-breaks in logging
-  , _keyLocale   :: KeyLocale -- ^ Table of name-keycode correspondences
+  { _logLevel    :: LogLevel    -- ^ Logging level
+  , _logSections :: Bool        -- ^ Used to enable section-breaks in logging
+  , _keyTableCfg :: KeyTableCfg -- ^ Table of name-keycode correspondences
   } deriving (Eq, Show)
 makeClassy ''GlobalCfg
 
@@ -198,11 +144,14 @@ instance Default RunCfg where def = RunCfg def def def def
 -- 1. Grab KeyI
 -- 2. Maybe parse a config file (to get at KeyI)
 data DiscoverCfg = DiscoverCfg
-  { _dInputCfg :: InputCfg
-  , _dParseCfg :: ParseCfg
+  { _dInputCfg  :: InputCfg -- ^ Config how to grab input
+  , _dParseCfg  :: ParseCfg -- ^ Config how to load config
+  , _dumpEnUS   :: Bool     -- ^ Flag indicating whether to dump table
   } deriving (Eq, Show)
+makeClassy ''DiscoverCfg
 
-instance Default DiscoverCfg where def = DiscoverCfg def def
+instance Default     DiscoverCfg where def      = DiscoverCfg def def False
+instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
 
 -- NOTE: 'ParseTest' does not have it own 'ParseTestCfg' because it *only* needs
 -- a ParseCfg. If we ever end up including more into ParseTest, we should give
@@ -217,11 +166,25 @@ data Task
 
 -- | The full 'Invocation' with which KMonad is called
 data Invocation = Invocation
-  { _globalCfg :: GlobalCfg -- ^ Global configuration settings
+  { _iGlobalCfg :: GlobalCfg -- ^ Global configuration settings
   , _task      :: Task      -- ^ What task we are instructed to perform
   } deriving (Eq, Show)
+makeClassy ''Invocation
 
-{- NOTE: Mods ------------------------------------------------------------------
-We use Endo SomeCfg to collect 'modifictions' to our configurations in the
-config and invocation parsing.
--------------------------------------------------------------------------------}
+instance HasGlobalCfg Invocation where globalCfg = iGlobalCfg
+
+{- NOTE: global environment ---------------------------------------------------}
+
+-- | The first runtime environment available to all of KMonad
+data GlobalEnv = GlobalEnv
+  { _geInvocation :: Invocation
+  , _geLogEnv     :: LogEnv
+  , _geKeyTable   :: KeyTable
+  }
+makeClassy ''GlobalEnv
+
+instance HasInvocation GlobalEnv where invocation = geInvocation
+instance HasLogEnv     GlobalEnv where logEnv     = geLogEnv
+instance HasKeyTable   GlobalEnv where keyTable   = geKeyTable
+
+type CanG m env = (EnvUIO m env, HasKeyTable env, HasLogEnv env, HasGlobalEnv env)

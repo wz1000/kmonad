@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE CPP #-}
 -- | TODO: Document me
 module System.Keyboard.IO.Evdev
@@ -26,6 +27,9 @@ import System.Keyboard.Util.FFI
 import Foreign.C.String
 import Foreign.C.Types
 import System.Posix
+import RIO.FilePath ((</>))
+import RIO.List (find, isSuffixOf)
+import UnliftIO.Directory (listDirectory)
 
 import qualified RIO.ByteString as B
 import qualified Data.Serialize as B (decode)
@@ -34,18 +38,14 @@ import qualified Data.Serialize as B (decode)
 {- NOTE: types -----------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
--- | The configuration record for evdev key-input on Linux
-newtype EvdevCfg = EvdevCfg
-  { _evdevPath :: FilePath -- ^ The path to the input-file to open and capture
-  } deriving Show
-makeClassy ''EvdevCfg
 
 -- | The environment used to handle evdev operations
 data EvdevEnv = EvdevEnv
   { _cfg :: EvdevCfg -- ^ The 'EvdevCfg' with which this env was started
+  , _pth :: FilePath -- ^ Path to the device file we opened
   , _fd  :: CInt     -- ^ Open file-descriptor to the Evdev keyboard
   , _h   :: Handle   -- ^ Haskell file handle to the same file
-  }
+  } deriving (Eq, Show)
 makeClassy ''EvdevEnv
 
 -- NOTE: `fd` and `h` point to the same file. I thought to refactor this and
@@ -61,29 +61,34 @@ type CanEvdev m env = (MonadIO m, MonadReader env m, HasEvdevEnv env)
 
 -- | All the things that can go wrong
 data EvdevException
-  = EvdevCouldNotAcquire EvdevCfg ReturnCode
+  = EvdevCouldNotDetect
+  -- ^ Could not autodetect a fitting keyboard
+  | EvdevCouldNotAcquire FilePath ReturnCode
   -- ^ Could not acquire IOCTL grab
-  | EvdevCouldNotRelease EvdevCfg ReturnCode
+  | EvdevCouldNotRelease EvdevEnv ReturnCode
   -- ^ Could not release IOCTL grab
-  | EvdevCouldNotRead    EvdevCfg
+  | EvdevCouldNotRead    EvdevEnv
   -- ^ Could not read from evdev file
-  | EvdevCouldNotDecode  EvdevCfg String
+  | EvdevCouldNotDecode  EvdevEnv String
   -- ^ Received unparseable input
   deriving Show
 makeClassyPrisms ''EvdevException
 
 -- | How to display EvdevExceptions
 instance Exception EvdevException where
-  displayException (EvdevCouldNotAcquire c n) = concat
-    [ "Failed to acquire ioctl-grab on: '", c^.evdevPath
+  displayException EvdevCouldNotDetect = concat
+    [ "Could not autodetect valid keyboard, please specify one in "
+    , "config or invocation."]
+  displayException (EvdevCouldNotAcquire p n) = concat
+    [ "Failed to acquire ioctl-grab on: '", p
     , "' with errorcode: ", show n ]
   displayException (EvdevCouldNotRelease c n) = concat
-    [ "Failed to release ioctl-grab on: '", c^.evdevPath
+    [ "Failed to release ioctl-grab on: '", c^.pth
     , "' with errorcode: ", show n ]
   displayException (EvdevCouldNotRead c) = concat
-    [ "Could not read from: '", c^.evdevPath]
+    [ "Could not read from: '", c^.pth]
   displayException (EvdevCouldNotDecode c t) = concat
-    [ "Failed to parse event from: '", c^.evdevPath
+    [ "Failed to parse event from: '", c^.pth
     , "' with error message: ", t ]
 
 instance AsEvdevException SomeException where _EvdevException = exception
@@ -113,16 +118,24 @@ c_iotctl_keyboard _ _ =
 -- | Open a device file and execute an ioctl grab
 openEvdev :: EvdevCfg -> IO EvdevEnv
 openEvdev cfg = do
+  pth <- case cfg^.evdevPath of
+    Just p -> pure p
+    Nothing -> do
+      ps <- listDirectory "/dev/input/by-path"
+      case find ("kbd" `isSuffixOf`) ps of
+        Just p  -> pure $ "/dev/input/by-path" </> p
+        Nothing -> throwing _EvdevCouldNotDetect ()
+
   let flags = OpenFileFlags False False False False False
-  (Fd fd_) <- openFd (cfg^.evdevPath) ReadOnly Nothing flags
+  (Fd fd_) <- openFd pth ReadOnly Nothing flags
   h        <- fdToHandle (Fd fd_)
-  c_ioctl_keyboard fd_ 1 `onNonZeroThrow` (_EvdevCouldNotAcquire, cfg)
-  pure $ EvdevEnv cfg fd_ h
+  c_ioctl_keyboard fd_ 1 `onNonZeroThrow` (_EvdevCouldNotAcquire, pth)
+  pure $ EvdevEnv cfg pth fd_ h
 
 -- | Execute an ioctl release and close a device file
 closeEvdev :: EvdevEnv -> IO ()
 closeEvdev env = c_ioctl_keyboard (env^.fd) 0
-                   `onNonZeroThrow` (_EvdevCouldNotRelease, env^.cfg)
+                   `onNonZeroThrow` (_EvdevCouldNotRelease, env)
                    `finally` (closeFd . Fd $ env^.fd)
 
 {- NOTE: API -------------------------------------------------------------------
@@ -134,7 +147,7 @@ evdevReadLow = view evdevEnv >>= \env -> liftIO $ do
 
   bytes <- B.hGet (env^.h) 24
   case B.decode . B.reverse $ bytes of
-    Left s            -> throwing _EvdevCouldNotDecode (env^.cfg, s)
+    Left s            -> throwing _EvdevCouldNotDecode (env, s)
     Right (a,b,c,d,e) -> pure $ (LinPacket e d c b a)^.re _LinPacket
 
 -- | Return the first key press or release from an open device file
@@ -153,8 +166,8 @@ withEvdevEnv :: MonadUnliftIO m => EvdevCfg -> (EvdevEnv -> m a) -> m a
 withEvdevEnv cfg = bracket (liftIO $ openEvdev cfg) (liftIO . closeEvdev)
 
 -- | Run some function in the context of an acquired device file
-withEvdev :: MonadUnliftIO m => EvdevCfg -> (KeyI -> m a) -> m a
-withEvdev cfg f = withEvdevEnv cfg $ \env -> f (KeyI (runRIO env evdevRead))
+withEvdev :: MonadUnliftIO m => EvdevCfg -> (BasicKeyI -> m a) -> m a
+withEvdev cfg f = withEvdevEnv cfg
+  $ \env -> f (BasicKeyI (runRIO env evdevRead))
 
-
-instance CanOpenKeyI EvdevCfg where withKeyI = withEvdev
+instance CanOpenBasicKeyI EvdevCfg where withBasicKeyI = withEvdev

@@ -4,34 +4,31 @@ where
 
 import KMonad.Prelude
 
-import Text.Pretty.Simple
+-- import Text.Pretty.Simple
 
 import KMonad.App.Invocation
-import KMonad.App.KeyIO
 import KMonad.App.Types
-import KMonad.App.Parser.IO -- FIXME: change import when invoc/parse separation is clean
-import KMonad.App.Main.Loop
-import KMonad.App.Main.OS
-import KMonad.Model hiding (withModel) -- FIXME: change when pullchain is factored out
-import KMonad.Util hiding (logLvl)
-import KMonad.Pullchain.IO
-
 import KMonad.App.Main.Discover
+import KMonad.Util.Logging
 
-import qualified RIO.Text.Lazy as T
+import System.Keyboard
+import System.Keyboard.IO
+-- import KMonad.App.KeyIO
+-- import KMonad.App.Types
+-- import KMonad.App.Parser.IO -- FIXME: change import when invoc/parse separation is clean
+-- import KMonad.App.Main.Loop
+-- import KMonad.App.Main.OS
+-- import KMonad.Model hiding (withModel) -- FIXME: change when pullchain is factored out
+-- import KMonad.Util hiding (logLvl)
+-- import KMonad.Pullchain.IO
 
-import Text.Pretty.Simple
+-- import KMonad.App.Main.Discover
 
--- TODO: Fix bad naming of loglevel clashing between Cmd and Logging
+-- import qualified RIO.Text.Lazy as T
 
-{- NOTE:
+-- import Text.Pretty.Simple
 
-The normal 'Types', 'IO', 'Operations', subdivision does not make a lot of sense
-for 'Main', since *everything* is IO. However, since the module was getting
-rather big, here are the main routines involved in setting up the environment
-and starting the app-loop.
-
--}
+import qualified RIO.Text as T
 
 --------------------------------------------------------------------------------
 -- $init
@@ -78,24 +75,40 @@ and starting the app-loop.
 --   mkCtx $ bracket init cleanup
 
 
---------------------------------------------------------------------------------
--- $loop
---
--- All the top-level code used to start and continue KMonad's app-loop
-
 -- | The entrypoint of KMonad
 --
--- When called interactively: parse the 'Invoc' from the command-line and pass
--- it on to run.
---
--- NOTE: We separate 'main' from 'run', so 'run' could be used to execute
--- programatically defined 'Invoc's if so desired.
---
+-- 1. Parse the command-line invocation
+-- 2. Initialize the global context
+-- 3. Dispatch on the Task
 main :: OnlyIO ()
-main = getInvoc >>= run
+main = do
+  invoc <- getInvocation
 
-run :: Invocation -> OnlyIO ()
-run = pPrint
+  let logcfg = (def :: LogCfg)
+        & logLvl .~ (invoc^.logLevel)
+        & logSep .~ (if invoc^.logSections then line else noSep)
+
+  withLogging logcfg $ \logenv -> runRIO logenv $ do
+
+    sepDebug
+    logDebug "Starting KMonad with the following invocation:"
+    logDebug . ppRecord $ invoc
+
+    withKeyTable (invoc^.keyTableCfg) $ \keytbl -> do
+
+      let gloenv = GlobalEnv
+                { _geInvocation = invoc
+                , _geLogEnv     = logenv
+                , _geKeyTable   = keytbl
+                }
+
+      runRIO gloenv . run $ invoc^.task
+
+-- | Run the task
+run :: CanG m env => Task -> m ()
+run (Discover  cfg) = runDiscover cfg
+run (ParseTest cfg) = logError "parsetest!"
+run (Run       cfg) = logError "run!"
 
 
 -- | Run KMonad using the provided configuration

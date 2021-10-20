@@ -60,6 +60,7 @@ common shared-props
     , pathwalk
     -- ^^ TODO: delete when done debugging 'load all keymaps' function
     , pretty-simple
+    , raw-strings-qq
     , resourcet
     , rio
     , template-haskell
@@ -88,6 +89,7 @@ library
       System.Keyboard.IO.Uinput
       System.Keyboard.IO.General
       System.Keyboard.Util.FFI
+      System.Keyboard.EnUS
       -- /end-of-module
 
   exposed-modules:

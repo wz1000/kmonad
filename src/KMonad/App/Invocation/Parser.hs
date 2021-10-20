@@ -68,6 +68,7 @@ parseTestP = ParseTest <$> parseCfgP
 discoverP :: Parser Task
 discoverP = let cfg = DiscoverCfg <$> inputCfgP
                                   <*> parseCfgP
+                                  <*> dumpEnUSP
             in Discover <$> cfg
 
 {- NOTE: global configuration options -----------------------------------------}
@@ -95,8 +96,8 @@ disableSectionsP = flag True False
   <> help "Disable section separators in logging output")
 
 -- | A path to a file to load the key-table from
-keyTableP :: Parser KeyLocale
-keyTableP = option (CustomLocale <$> str)
+keyTableP :: Parser KeyTableCfg
+keyTableP = option (CustomTable <$> str)
   (  long  "key-table"
   <> short 'T'
   <> value EnUS
@@ -163,11 +164,11 @@ inputTokenP = option (maybeReader f)
   )
   where
     f s = case break (== ':') s of
-      ("evdev", "")    -> Just $ Evdev Nothing
-      ("evdev", ':':s) -> Just $ Evdev (Just s)
+      ("evdev", "")    -> Just $ Evdev (EvdevCfg Nothing)
+      ("evdev", ':':s) -> Just $ Evdev (EvdevCfg (Just s))
       ("llhook", "")   -> Just $ LLHook
-      ("iokit", "")    -> Just $ IOKit Nothing
-      ("iokit", ':':s) -> Just $ IOKit (Just $ pack s)
+      ("iokit", "")    -> Just $ IOKit
+      -- ("iokit", ':':s) -> Just $ IOKit (Just $ pack s)
       _                -> Nothing
     h = mconcat
         [ "String describing how to capture the keyboard. Pattern: `name:arg` "
@@ -177,7 +178,7 @@ inputTokenP = option (maybeReader f)
         , "iokit, iokit:my-kb" ]
 
 -- | Configureable startup delay
-startDelayP :: Parser Ms
+startDelayP :: Parser Int
 startDelayP = option (fi <$> (auto :: ReadM Int))
   (  long  "start-delay"
   <> short 's'
@@ -255,3 +256,9 @@ parseCfgP = ParseCfg <$> option (InRoot <$> str)
   <> help    "The kmonad configuration file to load."
   )
 
+{- NOTE: ungrouped parsers ----------------------------------------------------}
+
+dumpEnUSP :: Parser Bool
+dumpEnUSP = switch
+  (  long "dump-table"
+  <> help "If provided, print the standard keytable and exit")

@@ -3,16 +3,39 @@
 module System.Keyboard.Operations where
 
 import System.Keyboard.Prelude
+import System.Keyboard.EnUS
 import System.Keyboard.Types
+
+import RIO.Partial (read, toEnum)
+import qualified RIO.Text as T
 
 -- | Shorthand functions
 pressOf, releaseOf :: Keycode -> KeySwitch
 pressOf   = mkKeySwitch Press
 releaseOf = mkKeySwitch Release
--- NOTE: These should probably live somewhere else
+-- NOTE: These should probably live somewhere else as they are smart construtcors
 
-{- NOTE: KeyTable operations --------------------------------------------------}
+{- NOTE: Parsing text as keycodes ---------------------------------------------}
 
+-- | Read a 'Keycode' from Text.
+readKeycode :: IsKeycode c => Text -> Maybe c
+readKeycode "~" = Nothing
+readKeycode t   = Just . view (from _Keycode) $ toEnum (read (unpack t) :: Int)
+
+-- | Read a 'KeyTable' from Text.
+readKeyTable :: Text -> KeyTable
+readKeyTable = KeyTable . map g . drop 2 . T.lines
+  where g t = let [n, l, m, w, d] = map T.strip
+                                . take 5 . drop 1
+                                . T.split (== '|') $ t
+              in KeyCongruence n d (readKeycode l) (readKeycode m) (readKeycode w)
+
+-- | The builtin `standard` 'KeyTable'
+enUSTable :: KeyTable
+enUSTable = readKeyTable enUSTableText
+
+
+{- NOTE: simple KeyTable operations -------------------------------------------}
 
 -- | Lookup a Keycode for a particular OS in a KeyTable
 --
@@ -42,4 +65,14 @@ lookupKeyname t n = grab =<< lookupKeyname' t n
                                    Mac     -> k^?keyMac._Just._Keycode
                                    Windows -> k^?keyWin._Just._Keycode
 
+{- NOTE: monadic KeyTable operations for ease of use --------------------------}
 
+type CanKeyTable m env = (MonadReader env m, HasKeyTable env)
+
+-- | Lookup all table entries for the 'Keycode' under the current OS
+getNames :: CanKeyTable m env => Keycode -> m [KeyCongruence]
+getNames c = (`lookupKeycode` c) <$> view keyTable
+
+-- | Lookup a 'Keycode' for some 'Keyname' under the current OS
+getCode :: CanKeyTable m env => Keyname -> m (Maybe Keycode)
+getCode n = (`lookupKeyname` n) <$> view keyTable

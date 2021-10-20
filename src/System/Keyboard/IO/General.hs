@@ -1,53 +1,40 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {- General, cross-platform IO stuff -}
 
 
 module System.Keyboard.IO.General where
 
 import System.Keyboard.Prelude
-
+import System.Keyboard.Operations
 import System.Keyboard.Types
+
+import System.Keyboard.IO.Evdev
+import System.Keyboard.IO.Uinput
 
 
 
 import RIO.Partial (read, toEnum)
 import qualified RIO.Text as T
 
-
-
-
--- | Read a 'Keycode' from Text.
---
-readKeycode :: IsKeycode c => Text -> Maybe c
-readKeycode "~" = Nothing
-readKeycode t   = Just . view (from _Keycode) $ toEnum (read (unpack t) :: Int)
-
-
-
--- | Load a KeyTable from file by parsing a table
---
--- The file-format is extremely strict:
--- - The first 2 lines are ignored, leaving room for column names and a line
--- - Each line consists of 5 columns delineated by 7 '|' symbols
---
--- For an example, see 'kmonad:keycode_table/en_US.md'
-loadKeyTable :: MonadIO m => FilePath -> m KeyTable
-loadKeyTable f = do
-
-  let g t = let [n, l, m, w, d] = map T.strip
-                                . take 5 . drop 1
-                                . T.split (== '|') $ t
-            in KeyCongruence n d (readKeycode l) (readKeycode m) (readKeycode w)
-
-  KeyTable . map g . drop 2 . T.lines <$> readFileUtf8 f
+{- NOTE: Pleasant wrappers ----------------------------------------------------}
 
 getKey :: (MonadIO m, MonadReader env m, HasKeyI env) => m KeySwitch
 getKey = view (keyI . uKeyI) >>= liftIO
 
 
--- putKey :: CanKeyO m env => KeySwitch -> m ()
--- putKey e =
+{- NOTE: KeyTable contexts ----------------------------------------------------}
 
---   view (keyPutter . uKeyPutter) >>= liftIO . ($ e)
+withKeyTable :: MonadUnliftIO m => KeyTableCfg -> (KeyTable -> m a) -> m a
+withKeyTable EnUS              f = f enUSTable
+withKeyTable (CustomTable pth) f = f =<< readKeyTable <$> readFileUtf8 pth
 
--- withKI :: MonadUnliftIO m => KICfg -> (KeyI -> m a) -> m a
--- withKI = withKeyI
+
+{- NOTE: OS-agnostic key-IO ---------------------------------------------------}
+
+withInput :: MonadUnliftIO m => InputCfg -> (KeyI -> m a) -> m a
+withInput c f = do
+  threadDelay $ 1000 * c^.startDelay
+  case c^.inputToken of
+    (Evdev c) -> withEvdev c $ \(BasicKeyI i) -> f (KeyI i)
+
+instance CanOpenKeyI InputCfg where withKeyI i = withInput i

@@ -374,14 +374,30 @@ instance Storable MacPacket where
     pokeByteOff ptr 8 p
     pokeByteOff ptr 12 u
 
+{- NOTE: Mac IO -----------------------------------------------------------}
+
+newtype IOKitCfg = IOKitCfg
+  { _productStr :: Maybe Text -- ^ A string to restrict which keyboard to capture
+  } deriving Show
+makeClassy ''IOKitCfg
+
+instance Default IOKitCfg where def = IOKitCfg Nothing
+
+-- | Configuration for (k/d)ext keysink in Mac
+--
+-- Note that Mac has no configuration options,, but we maintain this type for
+-- symmetry and ease of future extension.
+data ExtCfg = ExtCfg deriving (Eq, Show)
+
+instance Default ExtCfg where def = ExtCfg
+
 {- NOTE: OS-support types ------------------------------------------------------
 Much of this library is OS-specific code. We would like to provide an
 OS-agnostic interface to this code. That is why we gather the different
 configurations into the following sum-types.
 -------------------------------------------------------------------------------}
 
-{- NOTE: Informative OS error -------------------------------------------------}
-
+-- | The different OSes that we support
 data OS = Linux | Mac | Windows deriving (Eq, Ord, Show)
 
 -- | The OS under which we are compiled
@@ -394,6 +410,7 @@ currentOS = Mac
 currentOS = Windows
 #endif
 
+-- | Exceptions thrown when trying to do something on the wrong OS
 data OSException = FFIWrongOS Description OS
   deriving Show
 
@@ -402,104 +419,10 @@ instance Exception OSException where
     [ "Tried to '", action, "' on <", tshow currentOS
     , ">. But this is only supported on <", tshow target, ">" ]
 
-{- NOTE: Config sumtypes ------------------------------------------------------}
-
-
--- | Configuration for (k/d)ext keysink in Mac
---
--- Note that Mac has no configuration options,, but we maintain this type for
--- symmetry and ease of future extension.
-data ExtCfg = ExtCfg deriving (Eq, Show)
-
-instance Default ExtCfg where def = ExtCfg
-
-{- NOTE: General output types -------------------------------------------------}
-
--- | A token hiding all the functionality required to put keys into the OS
-data KeyO = KeyO
-  { _emitKey   :: KeySwitch -> IO () -- ^ How to emit a switch event to OS
-  , _repeatKey :: Keycode   -> IO () -- ^ How to signal OS to repeat a keyswitch
-  }
-makeLenses ''KeyO
-
--- | A class generalizing the concept of some config that allows opening a key sink
-class CanOpenKeyO cfg where
-  withKeyO :: forall m a. MonadUnliftIO m => cfg -> (KeyO -> m a) -> m a
-
--- | An existential wrapper hiding the concrete type of the output configuration
--- NOTE: do I need this?
-data KeyOCfg = forall cfg. CanOpenKeyO cfg => KeyOCfg cfg
--- | How to auto-unwrap the wrapper
-instance CanOpenKeyO KeyOCfg where withKeyO (KeyOCfg cfg) = withKeyO cfg
-
-class HasKeyO env where keyO :: Getter env KeyO
-
-type CanKeyO m env = (MonadIO m, MonadReader env m, HasKeyO env)
-
-
-
-{- NOTE: General input types --------------------------------------------------}
-
--- | A token hiding all the functionality required to get keys from the OS
-newtype KeyI = KeyI { _uKeyI :: IO KeySwitch }
-makeLenses ''KeyI
-
-class CanOpenKeyI cfg where
-  withKeyI :: forall m a. MonadUnliftIO m => cfg -> (KeyI -> m a) -> m a
-
-class HasKeyI env where keyI :: Getter env KeyI
-instance HasKeyI KeyI where keyI = id
-
-
 {- NOTE: Names -----------------------------------------------------------------
-
-problem statement: we need:
-- to read in keys by their name from config files
-- display keys by their name during logging
-- the keycode-name relationship is different per OS
-- it is hard to figure out the keycodes for certain keys for certain OSes*
-- this mapping needs to be easy to extend and modify for dev-reasons and locales
-
-*: e.g.:
-- what is Windows representation of pushing the Mac 'Fn' key? I don't know how
-  to google this, and I don't have a Mac with windows on it.
-
-solution:
-- we define a collection of 'KeyCongruence's, that define standard names for
-  semantic buttons like 'the `a` key'.
-- create a table of these entries and use that for parsing, pretty-printing, and
-  maybe between-OS-transformation (possible, but why?)
-
-let's not worry about:
-- speed: this is something that happens rarely and pre-app-loop.
-
-
---------------------------------------------------------------------------------
-
-Now, let's think about the structure of the data:
-- the keyname *must be unique*
-- the description is only used for documentation and logging
-- the codes can have duplicates and missing values*
-
-*: e.g.:
-- windows doesn't distinguish between `ret` and `kpret`, so the semantic buttons
-  'return' and 'keypad return' map to the same keycode in Windows.
-
---------------------------------------------------------------------------------
-
-Actually... we could move this decision to the edge by making IO:
-
-data Keycode = Literal Word64 | Named NamedKey
-
-sendEvent ::  Keycode -> IO ()
-
-That way we can always invent a `winSendEvent (Named "kpret")` later without
-having to touch any of the other code.
-
-
 -------------------------------------------------------------------------------}
 
--- | A record describing
+-- | A record describing a correspondence between a semantic key and OS codes
 data KeyCongruence = KeyCongruence
   { _keyName        :: Keyname
   , _keyDescription :: Text
@@ -509,11 +432,29 @@ data KeyCongruence = KeyCongruence
   } deriving (Eq, Show)
 makeLenses ''KeyCongruence
 
+instance Display KeyCongruence where
+  textDisplay k = mconcat
+    [ k^.keyName, " "
+    , maybe "~" tshow (k^?keyLin._Just._Keycode), " "
+    , maybe "~" tshow (k^?keyMac._Just._Keycode), " "
+    , maybe "~" tshow (k^?keyWin._Just._Keycode), " "
+    , "(", k^.keyDescription, ")"
+    ]
+
+-- | A table of keyname to keycode mappings across OSes
 newtype KeyTable = KeyTable { _uKeyTable :: [KeyCongruence] }
   deriving (Show, Eq)
 
 -- | Value indicating which key-locale to use.
-data KeyLocale = EnUS | CustomLocale FilePath deriving (Eq, Show)
+data KeyTableCfg
+  = EnUS                 -- ^ Use the standard, built-in keytable
+  | CustomTable FilePath -- ^ Use a custom keytable, to be loaded from file
+  deriving (Eq, Show)
+
+-- | A class describing how a keytable is stored.
+class HasKeyTable a where keyTable :: Getter a KeyTable
+
+instance HasKeyTable KeyTable where keyTable = id
 
 {- NOTE: Key-repeat types ------------------------------------------------------
 -------------------------------------------------------------------------------}
@@ -539,23 +480,153 @@ instance Default KeyRepeatCfg where
   def = KeyRepeatCfg 300 100 False
 #endif
 
--- | Runtime environment for the key-repeat process
-data KeyRepeatEnv = KeyRepeatEnv
-  { _repeatCfg :: KeyRepeatCfg
-  , _current   :: MVar (Maybe (Async ()))
-  , _krKeyO      :: KeyO
-  }
-makeLenses ''KeyRepeatEnv
+{- NOTE: General output types -------------------------------------------------
 
-instance HasKeyO KeyRepeatEnv where keyO = krKeyO
+The above types all dealt with the concrete nitty-gritty of making something
+read and write to the OS. We also provide a more generalized interface that
+wraps around the nitty-gritty and adds additional functionality:
 
+Output:
+- key-repeat support
 
-{- NOTE: IO-types --------------------------------------------------------------
+Input
+- capture-delay to allow releasing of the enter key
+
 -------------------------------------------------------------------------------}
 
--- | A token containing all the functionality required to key keys from the OS
-newtype KeyGetter = KeyGetter { _uKeyGetter :: IO KeySwitch }
-makeLenses ''KeyGetter
+{- NOTE: basic api ------------------------------------------------------------}
+
+-- | The configuration record for evdev key-input on Linux
+--
+-- If no path is passed to Evdev, we try to autodetect the keyboard by matching
+-- the first keyboard under @/dev/input/by-path@ that ends in @kbd@
+newtype EvdevCfg = EvdevCfg
+  { _evdevPath :: Maybe FilePath -- ^ The path to the device-file
+  } deriving (Eq, Show)
+makeClassy ''EvdevCfg
+
+instance Default EvdevCfg where def = EvdevCfg Nothing
+
+-- | Simple reader of key input
+newtype BasicKeyI = BasicKeyI { _uBasicKeyI :: IO KeySwitch }
+
+-- | Simple writer of key output
+data BasicKeyO = BasicKeyO
+  { _bEmitKey   :: KeySwitch -> IO ()
+  , _bRepeatKey :: Keycode   -> IO ()
+  }
+
+-- | How a config opens basic key input
+class CanOpenBasicKeyI cfg where
+  withBasicKeyI :: forall m a. MonadUnliftIO m
+    => cfg -> (BasicKeyI -> m a) -> m a
+
+-- | How a config opens basic key output
+class CanOpenBasicKeyO cfg where
+  withBasicKeyO :: forall m a. MonadUnliftIO m
+    => cfg -> (BasicKeyO -> m a) -> m a
+
+{- NOTE: smooth api -----------------------------------------------------------}
+
+-- | High-level keyboard input access
+newtype KeyI = KeyI { _uKeyI :: IO KeySwitch }
+makeLenses ''KeyI
+
+class HasKeyI a where keyI :: Getter a KeyI
+
+class CanOpenKeyI cfg where
+  withKeyI :: forall m a. MonadUnliftIO m => cfg -> (KeyI -> m a) -> m a
+
+
+-- | High-level keyboard output access
+newtype KeyO = KeyO { _uKeyO :: KeySwitch -> IO () }
+
+-- | All available methods of capturing keyboards
+data InputToken
+  = Evdev EvdevCfg -- ^ Linux evdev source with optional FilePath to device
+  | LLHook                 -- ^ Windows low-level keyboard hook
+  | IOKit      -- ^ Mac IOKit source with optional keyboard subset
+  deriving (Eq, Show)
+makeClassyPrisms ''InputToken
+
+
+
+instance Default InputToken where
+#if defined linux_HOST_OS
+  def = Evdev def
+#elif defined darwin_HOST_OS
+  def = IOKit Nothing
+#elif defined mingw32_HOST_OS
+  def = LLHook
+#endif
+
+-- | Full configuration describing how to acquire a keyboard
+data InputCfg = InputCfg
+  { _inputToken :: InputToken -- ^ Token describing how to acquire the keyboard
+  , _startDelay :: Int        -- ^ How many ms to wait before acquiring input keyboard
+  } deriving (Eq, Show)
+makeClassy ''InputCfg
+
+instance Default InputCfg where def = InputCfg def 200
+
+
+-- | All available methods of simulating keyboards
+data OutputToken
+  = Uinput (Maybe Text) (Maybe Text) -- ^ Linux @uinput@ with name and post-init cmd
+  | SendKeys                         -- ^ Windows @SendKeys@ based event injector
+  | Ext                              -- ^ Mac @dext/kext@ based event injector
+  deriving (Eq, Show)
+makeClassyPrisms ''OutputToken
+
+instance Default OutputToken where
+#if defined linux_HOST_OS
+  def = Uinput Nothing Nothing
+#elif defined darwin_HOST_OS
+  def = Ext
+#elif defined mingw32_HOST_OS
+  def = SendKeys
+#endif
+
+-- | Full configuration describing how to simulate a keyboard
+data OutputCfg = OutputCfg
+  { _outputToken  :: OutputToken
+  , _mayRepeatCfg :: KeyRepeatCfg
+  } deriving (Eq, Show)
+makeClassy ''OutputCfg
+
+instance Default OutputCfg where
+  def = OutputCfg def def
+
+
+
+
+{- NOTE: General input types --------------------------------------------------}
+
+-- | A token hiding all the core functionality required to put keys into the OS
+-- data BasicKeyO = BasicKeyO
+--   { _emitKey   :: KeySwitch -> IO () -- ^ How to emit a switch event to OS
+--   , _repeatKey :: Keycode   -> IO () -- ^ How to signal OS to repeat a keyswitch
+--   }
+-- makeLenses ''KeyO
+
+-- | A class generalizing the concept of some config that allows opening a key sink
+-- class CanOpenKeyO cfg where
+--   withKeyO :: forall m a. MonadUnliftIO m => cfg -> (KeyO -> m a) -> m a
+
+-- class HasKeyO env where keyO :: Getter env KeyO
+
+-- type CanKeyO m env = (MonadIO m, MonadReader env m, HasKeyO env)
+
+-- | A token hiding all the functionality required to get keys from the OS
+-- newtype KeyI = KeyI { _uKeyI :: IO KeySwitch }
+-- makeLenses ''KeyI
+
+-- class CanOpenKeyI cfg where
+--   withKeyI :: forall m a. MonadUnliftIO m => cfg -> (KeyI -> m a) -> m a
+
+-- class HasKeyI env where keyI :: Getter env KeyI
+-- instance HasKeyI KeyI where keyI = id
+
 
 -- class HasKeyGetter a where keyGetter :: Getter a KeyGetter
 -- class HasKeyPutter a where keyPutter :: Getter a KeyO
@@ -563,9 +634,15 @@ makeLenses ''KeyGetter
   -- , _repeatCfg :: Maybe KeyRepeatCfg -- ^ Key-repeat settings
 
 -- | The configuration options that can be passed to IOKitCfg.
-newtype IOKitCfg = IOKitCfg
-  { _productStr :: Maybe Text -- ^ A string to restrict which keyboard to capture
-  } deriving Show
-makeClassy ''IOKitCfg
 
-instance Default IOKitCfg where def = IOKitCfg Nothing
+
+
+-- | Runtime environment for the key-repeat process
+-- data KeyRepeatEnv = KeyRepeatEnv
+--   { _repeatCfg :: KeyRepeatCfg
+--   , _current   :: MVar (Maybe (Async ()))
+--   , _krKeyO      :: KeyO
+--   }
+-- makeLenses ''KeyRepeatEnv
+
+-- instance HasKeyO KeyRepeatEnv where keyO = krKeyO

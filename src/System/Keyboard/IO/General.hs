@@ -3,7 +3,7 @@
 
 module System.Keyboard.IO.General where
 
-import Prelude
+import System.Keyboard.Prelude
 
 import System.Keyboard.Types
 

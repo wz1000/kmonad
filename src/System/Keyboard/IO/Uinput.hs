@@ -18,10 +18,10 @@ module System.Keyboard.IO.Uinput
   )
 where
 
-import Prelude
+import System.Keyboard.Prelude
 
 import System.Keyboard.Types
-import Util.FFI
+import System.Keyboard.Util.FFI
 
 import System.IO.Error.Lens
 

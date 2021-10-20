@@ -2,7 +2,7 @@
 
 module System.Keyboard.Operations where
 
-import Prelude
+import System.Keyboard.Prelude
 import System.Keyboard.Types
 
 -- | Shorthand functions

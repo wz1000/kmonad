@@ -1,12 +1,12 @@
 -- |
-module Util.FFI
+module System.Keyboard.Util.FFI
   ( ReturnCode
   , onNonZero
   , onNonZeroThrow
   )
 where
 
-import Prelude
+import System.Keyboard.Prelude
 
 import RIO (MonadUnliftIO)
 

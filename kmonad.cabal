@@ -51,7 +51,6 @@ common shared-props
       base
     , cereal
     , hspec
-    , keyboard
     , lens
     , megaparsec
     , mtl
@@ -66,27 +65,7 @@ common shared-props
     , unliftio
   default-language: Haskell2010
 
-library keyboard
-  default-extensions:
-      ConstraintKinds
-      GeneralizedNewtypeDeriving
-      LambdaCase
-      MultiWayIf
-      NoImplicitPrelude
-      OverloadedStrings
-      TemplateHaskell
-      TupleSections
-  other-modules:
-    Prelude
-    System.Keyboard.Operations
-    System.Keyboard.Types
-    System.Keyboard.IO.Evdev
-    System.Keyboard.IO.Uinput
-    System.Keyboard.IO.General
-    Util.FFI
   exposed-modules:
-    System.Keyboard
-    System.Keyboard.IO
   build-depends: base, cereal, data-default, hashable, lens, rio, time
   hs-source-dirs: lib/keyboard
   default-language: Haskell2010
@@ -105,7 +84,28 @@ library
     -Wall
     -Wno-name-shadowing
     -Wno-unused-imports
+
+  other-modules:
+      -- The following section is its own library. I tried using cabal's internal
+      -- library feature, but it gives `stack repl` some serious hiccups and makes
+      -- the dev-process a headache. Should factor this out to its own proper
+      -- project at some point.
+      System.Keyboard.Operations
+      System.Keyboard.Prelude
+      System.Keyboard.Types
+      System.Keyboard.IO.Evdev
+      System.Keyboard.IO.Uinput
+      System.Keyboard.IO.General
+      System.Keyboard.Util.FFI
+      -- /end-of-module
+
   exposed-modules:
+      -- Like above, but exposed
+      System.Keyboard
+      System.Keyboard.IO
+      -- /end-of-module
+
+
       KMonad.App
       KMonad.App.Main
       KMonad.App.Main.Discover

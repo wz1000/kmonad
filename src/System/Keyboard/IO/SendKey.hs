@@ -7,7 +7,7 @@ module System.Keyboard.IO.SendKey
   )
 where
 
-import Prelude
+import System.Keyboard.Prelude
 
 import System.Keyboard.Types
 

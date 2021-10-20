@@ -16,7 +16,7 @@ Place the following here:
 
 module System.Keyboard.Types where
 
-import Prelude
+import System.Keyboard.Prelude
 
 import Data.Bits
 import Foreign.Storable

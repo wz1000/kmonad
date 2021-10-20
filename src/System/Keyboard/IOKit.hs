@@ -3,7 +3,7 @@
 
 module System.Keyboard.IOKit where
 
-import Prelude
+import System.Keyboard.Prelude
 import System.Keyboard.Types
 
 import Foreign.C.String

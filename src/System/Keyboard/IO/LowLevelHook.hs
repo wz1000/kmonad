@@ -2,7 +2,7 @@
 module System.Keyboard.IO.LLHook
 where
 
-import Prelude
+import System.Keyboard.Prelude
 
 import System.Keyboard.Types
 

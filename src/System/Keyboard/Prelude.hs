@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-dodgy-imports #-}
 
-module Prelude
+module System.Keyboard.Prelude
   ( module X
 
   , fi
@@ -29,8 +29,6 @@ import RIO as X hiding
 
     -- Some stuff I'd rather default to Text
   , unlines, lines
-
-  , catchIO
   )
 
 -- For util

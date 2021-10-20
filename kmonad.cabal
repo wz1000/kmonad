@@ -107,7 +107,6 @@ library
       KMonad.App.Invocation.IO
       KMonad.App.Invocation.Operations
       KMonad.App.Invocation.Parser
-      KMonad.App.Invocation.Types
       KMonad.App.Invocation.TH
       KMonad.App.KeyIO
       KMonad.App.KeyIO.Common

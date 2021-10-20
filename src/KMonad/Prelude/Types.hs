@@ -13,9 +13,6 @@ import qualified RIO as R
 
 --------------------------------------------------------------------------------
 
--- | A class for things that have default values
-class Default a where def :: a
-
 -- | A type for predicates
 type Pred a = a -> Bool
 

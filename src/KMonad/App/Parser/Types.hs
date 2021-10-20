@@ -29,8 +29,8 @@ module KMonad.App.Parser.Types
   , KExpr(..)
 
     -- * $defio
-  , IToken(..)
-  , OToken(..)
+  -- , IToken(..)
+  -- , OToken(..)
 
     -- * $lenses
   , AsKExpr(..)
@@ -43,6 +43,7 @@ module KMonad.App.Parser.Types
 
 import KMonad.Prelude
 import KMonad.App.KeyIO
+import KMonad.App.Types
 import KMonad.Model.Types
 import KMonad.Pullchain.Button
 import KMonad.Pullchain.Types
@@ -160,24 +161,12 @@ data DefLayer = DefLayer
 --
 -- Different settings
 
--- | All different input-tokens KMonad can take
-data IToken
-  = KDeviceSource FilePath
-  | KLowLevelHookSource
-  | KIOKitSource (Maybe Text)
-  deriving Show
 
--- | All different output-tokens KMonad can take
-data OToken
-  = KUinputSink Text (Maybe Text) (Maybe KeyRepeatCfg)
-  | KSendEventSink (Maybe Int) (Maybe Int)
-  | KExtSink
-  deriving Show
 
 -- | All possible single settings
 data DefSetting
-  = SIToken      IToken
-  | SOToken      OToken
+  = SIToken      InputToken
+  | SOToken      OutputToken
   | SCmpSeq      DefButton
   | SInitStr     Text
   | SFallThrough Bool

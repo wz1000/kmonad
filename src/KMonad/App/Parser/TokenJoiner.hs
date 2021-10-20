@@ -27,6 +27,7 @@ where
 
 import KMonad.Prelude hiding (uncons)
 
+import KMonad.App.Types
 import KMonad.App.Parser.Types
 import KMonad.App.KeyIO
 
@@ -228,23 +229,18 @@ getAllow = do
     Left Duplicate -> throwError $ DuplicateSetting "allow-cmd"
 
 
-pickInput :: IToken -> J KeyInputCfg
-pickInput (KDeviceSource f)     = pure $ LinuxEvdevCfg          $ EvdevCfg $ f
-pickInput (KIOKitSource n)      = pure $ MacIOKitCfg            $ IOKitCfg $ n
-pickInput (KLowLevelHookSource) = pure $ WindowsLowLevelHookCfg $ LowLevelHookCfg
+pickInput :: InputToken -> J KeyInputCfg
+pickInput (Evdev f)     = pure $ LinuxEvdevCfg          $ EvdevCfg $ fromMaybe "arst" f
+pickInput (IOKit n)      = pure $ MacIOKitCfg            $ IOKitCfg $ n
+pickInput LLHook = pure $ WindowsLowLevelHookCfg $ LowLevelHookCfg
 
-pickOutput :: OToken -> J KeyOutputCfg
-pickOutput (KUinputSink t init repcfg) = pure $ LinuxUinputCfg
-  $ def { _keyboardName = t
-        , _postInit     = unpack <$> init
-        , _mayRepeatCfg = repcfg
+pickOutput :: OutputToken -> J KeyOutputCfg
+pickOutput (Uinput _ _) = pure $ LinuxUinputCfg
+  $ def { _keyboardName = "hello"
+        , _postInit     = Nothing -- unpack <$> init
         }
--- FIXME: The following is ugly syntax
-pickOutput (KSendEventSink delay interval) = let
-  d'  = maybe def (\dl -> def { _delay    = fi dl }) delay
-  d'' = maybe d'  (\iv -> d'  { _interval = fi iv }) interval
-  in pure $ WindowsSendEventCfg  $ SendEventCfg d''
-pickOutput KExtSink       = pure $ MacExtCfg           $ ExtCfg
+pickOutput SendKeys = pure $ WindowsSendEventCfg (SendEventCfg def)
+pickOutput Ext = pure $ MacExtCfg           $ ExtCfg
 
 --------------------------------------------------------------------------------
 -- $als

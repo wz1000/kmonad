@@ -17,8 +17,8 @@ import qualified KMonad.Pullchain.Components.Hooks    as Hs
 import qualified KMonad.Pullchain.Components.Sluice   as Sl
 import qualified KMonad.Pullchain.Components.Keymap   as Km
 
--- | Use the 'ModelCfg' to start the pullchain and provide an API token
-withModel :: LUIO m env => ModelCfg -> Ctx r m ModelAPI
+-- | Use the 'PullchainCfg' to start the pullchain and provide an API token
+withModel :: LUIO m env => PullchainCfg -> Ctx r m ModelAPI
 withModel cfg = do
   -- Create the model environment
   env <- initModelEnv cfg
@@ -30,7 +30,7 @@ withModel cfg = do
   mkCtx $ \f -> f (env^.modelAPI)
 
 -- | Initialize all the components required to run a pullchain model
-initModelEnv :: LUIO m env => ModelCfg -> Ctx r m ModelEnv
+initModelEnv :: LUIO m env => PullchainCfg -> Ctx r m ModelEnv
 initModelEnv cfg = do
   -- Fetch the logging env from the caller
   le <- lift $ view logEnv
@@ -58,6 +58,6 @@ initModelEnv cfg = do
       -- API
     , _meModelAPI = api
     , _meLogEnv   = le
-    , _meModelCfg = cfg
+    , _mePullchainCfg = cfg
     }
 

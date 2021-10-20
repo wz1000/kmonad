@@ -45,7 +45,7 @@ data ModelEnv = ModelEnv
 
   , _meModelAPI :: ModelAPI    -- ^ API to App
   , _meLogEnv   :: LogEnv      -- ^ Logging environment
-  , _meModelCfg :: ModelCfg    -- ^ The config we were provided
+  , _mePullchainCfg :: PullchainCfg    -- ^ The config we were provided
   }
 makeClassy ''ModelEnv
 
@@ -54,12 +54,12 @@ type K a = RIO ModelEnv a
 instance HasModelAPI ModelEnv where modelAPI = meModelAPI
 instance HasLogEnv   ModelEnv where logEnv   = meLogEnv
 instance HasLogCfg   ModelEnv where logCfg   = logEnv.logCfg
-instance HasModelCfg ModelEnv where modelCfg = meModelCfg
+instance HasPullchainCfg ModelEnv where pullchainCfg = mePullchainCfg
 
 --------------------------------------------------------------------------------
 
 instance
-  (HasModelEnv e, HasModelAPI e, HasLogEnv e, HasLogCfg e, HasModelCfg e)
+  (HasModelEnv e, HasModelAPI e, HasLogEnv e, HasLogCfg e, HasPullchainCfg e)
   => MonadKIO (RIO e) where
   -- Emitting by sending to the App
   emit e = sendToShell =<< keyEventNow e
@@ -113,7 +113,7 @@ makeClassy ''KEnv
 
 -- NOTE: This is a bit ridiculous, and could be much cleaner
 instance HasModelEnv KEnv where modelEnv = kModelEnv
-instance HasModelCfg KEnv where modelCfg = modelEnv.modelCfg
+instance HasPullchainCfg KEnv where pullchainCfg = modelEnv.pullchainCfg
 instance HasBEnv     KEnv where bEnv     = kBEnv
 instance HasLogEnv   KEnv where logEnv   = modelEnv.logEnv
 instance HasLogCfg   KEnv where logCfg   = logEnv.logCfg

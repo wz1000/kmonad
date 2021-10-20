@@ -1,142 +1,257 @@
 module KMonad.App.Invocation.Parser
-  ( invocP )
+  ( invocationP )
 where
 
-import KMonad.Prelude hiding (try)
+import KMonad.Prelude
 
+import KMonad.App.Types
 import KMonad.Util.Time
-import KMonad.Util.Logging
-import KMonad.App.Invocation.Types
-
--- Have to import carefully to avoid name-clashes between megaparsec (reexported
--- by Parser) and optparse-applicative.
-import KMonad.App.Parser hiding (Parser, option)
-import qualified KMonad.App.Parser as P (try, parse, choice, Parser)
+import System.Keyboard hiding (switch)
 
 import Options.Applicative
+import qualified RIO.Text as T
 
+{- NOTE: Notes to the programmer ----------------------------------------------
 
+Dear programmer, please be aware of the following:
 
---------------------------------------------------------------------------------
--- $prs
---
--- The different command-line parsers
+This module structures configurable settings into a number of categories.
+- global: applicable to any kmonad invocation
+- model: applicable only when we actually run a model
+- input: applicable for whenever we grab a keyboard
+- output: applicable whenever we simulate a keyboard
+- parse: applicable whenever we parse a config file
 
--- | Parse the full command
-invocP :: Parser Invoc
-invocP = Invoc
-  <$> fileP
-  <*> dryrunP
-  <*> levelP
-  <*> startDelayP
-  <*> cmdAllowP
-  <*> fallThrghP
-  <*> initStrP
-  <*> cmpSeqP
-  <*> oTokenP
-  <*> iTokenP
-  <*> expModeP
+Then we specify 3 different commands KMonad can execute, and pass the correct
+'categories' to them by means of a nested record:
+- run: uses all 5 categories
+- parse-test: uses only the parse category
+- discover: uses parse and input
 
--- | Parse a filename that points us at the config-file
-fileP :: Parser FilePath
-fileP = strArgument
-  (  metavar "FILE"
-  <> help    "The configuration file")
+-------------------------------------------------------------------------------}
 
--- | Parse a flag that allows us to switch to parse-only mode
-dryrunP :: Parser Bool
-dryrunP = switch
-  (  long    "dry-run"
-  <> short   'd'
-  <> help    "If used, do not start KMonad, only try parsing the config file"
+{- NOTE: top level parser -----------------------------------------------------}
+
+-- | Top level parser
+invocationP :: Parser Invocation
+invocationP = Invocation
+  <$> globalCfgP
+  <*> taskP
+
+-- | Parse a Task
+taskP :: Parser Task
+taskP = hsubparser
+  (  command "run"
+    (info runP
+     (progDesc "Run a keyboard remapping."))
+  <> command "parse-test"
+    (info parseTestP
+     (progDesc "Check a config-file's syntax." ))
+  <> command "discover"
+    (info discoverP
+     (progDesc "Print out what we know about key-presses." ))
   )
 
--- | Parse the log-level as either a level option or a verbose flag
-levelP :: Parser LogLevel
-levelP = option f
+-- | Collects all the passable options for a run into a single parser
+runP :: Parser Task
+runP = let cfg = RunCfg <$> modelCfgP
+                        <*> inputCfgP
+                        <*> outputCfgP
+                        <*> parseCfgP
+       in Run <$> cfg
+
+-- | Collects all the passable options for a parse-test into a single parser
+parseTestP :: Parser Task
+parseTestP = ParseTest <$> parseCfgP
+
+-- | Collects all the passable options for a discover run into a single parser
+discoverP :: Parser Task
+discoverP = let cfg = DiscoverCfg <$> inputCfgP
+                                  <*> parseCfgP
+            in Discover <$> cfg
+
+{- NOTE: global configuration options -----------------------------------------}
+
+-- | Parse global configuration options available to every subcommand
+globalCfgP :: Parser GlobalCfg
+globalCfgP = GlobalCfg <$> logLevelP <*> disableSectionsP <*> keyTableP
+
+-- | The log-level of either error, warn, info, or debug
+logLevelP :: Parser LogLevel
+logLevelP = option f
   (  long    "log-level"
   <> short   'l'
-  <> metavar "Log level"
   <> value   LevelWarn
-  <> help    "How much info to print out (debug, info, warn, error)" )
+  <> help    "Logging verbosity (debug > info > warn > error)" )
   where
-    f = maybeReader $ flip lookup [ ("debug", LevelDebug), ("warn", LevelWarn)
-                                  , ("info",  LevelInfo),  ("error", LevelError) ]
+    f = maybeReader $ flip lookup
+          [ ("debug", LevelDebug), ("warn", LevelWarn)
+          , ("info",  LevelInfo),  ("error", LevelError) ]
 
--- | Allow the execution of arbitrary shell-commands
-cmdAllowP :: Parser DefSetting
-cmdAllowP = SAllowCmd <$> switch
-  (  long "allow-cmd"
+-- | A flag that, when passed, disables section separators in logging
+disableSectionsP :: Parser Bool
+disableSectionsP = flag True False
+  (  long "no-log-sections"
+  <> help "Disable section separators in logging output")
+
+-- | A path to a file to load the key-table from
+keyTableP :: Parser KeyLocale
+keyTableP = option (CustomLocale <$> str)
+  (  long  "key-table"
+  <> short 'T'
+  <> value EnUS
+  <> help  "Custom keyname table file to use instead of KMonad default."
+  )
+
+{- NOTE: model configuration options ------------------------------------------}
+
+-- | Flag that, when passed, enabled shell command execution by KMonad
+enableCmdP :: Parser Bool
+enableCmdP = switch
+  (  long  "allow-cmd"
   <> short 'c'
-  <> help "Whether to allow the execution of arbitrary shell-commands"
+  <> help  "Enable shell-command execution in KMonad"
   )
 
--- | Re-emit unhandled events
-fallThrghP :: Parser DefSetting
-fallThrghP = SFallThrough <$> switch
-  (  long "fallthrough"
+-- | Flag that, when passed, disables uncaught event rethrowing.
+disableFallthroughP :: Parser Bool
+disableFallthroughP = flag True False
+  (  long  "no-fallthrough"
   <> short 'f'
-  <> help "Whether to simply re-emit unhandled events"
+  <> help  "Disable rethrowing uncaught events"
   )
 
--- | TODO what does this do?
-initStrP :: Parser (Maybe DefSetting)
-initStrP = optional $ SInitStr <$> strOption
-  (  long "init"
-  <> short 't'
-  <> metavar "STRING"
-  <> help "TODO"
+-- | Passable option to change compose key
+composeKeyP :: Parser Keyname
+composeKeyP = strOption
+  (  long  "compose"
+  <> value "ralt"
+  <> help  "Key to use for compose-key macro-sequences."
   )
 
--- | Key to use for compose-key sequences
-cmpSeqP :: Parser (Maybe DefSetting)
-cmpSeqP = optional $ SCmpSeq <$> option
-  (tokenParser keywordButtons <|> megaReadM (P.choice noKeywordButtons))
-  (  long "cmp-seq"
+-- | Passable option to change macro-delay
+macroDelayP :: Parser Ms
+macroDelayP = option (fi <$> (auto :: ReadM Int))
+  (  long  "macro-delay"
+  <> value 10
+  <> help  "Number of milliseconds to pause between keypresses in macros"
+  )
+
+-- | Collect all model-configuration options into 1 collection
+modelCfgP :: Parser ModelCfg
+modelCfgP = ModelCfg <$> enableCmdP
+                     <*> disableFallthroughP
+                     <*> composeKeyP
+                     <*> macroDelayP
+
+{- NOTE: input configuration parsing ------------------------------------------}
+
+-- | Parse a token-name:extra-cfg style string as an input token
+--
+-- Valid values:
+-- - evdev
+-- - evdev:/path/to/file
+-- - llhook
+-- - iokit
+-- - iokit:name-pattern
+inputTokenP :: Parser InputToken
+inputTokenP = option (maybeReader f)
+  (  long  "input"
+  <> short 'i'
+  <> value def
+  <> help  h
+  )
+  where
+    f s = case break (== ':') s of
+      ("evdev", "")    -> Just $ Evdev Nothing
+      ("evdev", ':':s) -> Just $ Evdev (Just s)
+      ("llhook", "")   -> Just $ LLHook
+      ("iokit", "")    -> Just $ IOKit Nothing
+      ("iokit", ':':s) -> Just $ IOKit (Just $ pack s)
+      _                -> Nothing
+    h = mconcat
+        [ "String describing how to capture the keyboard. Pattern: `name:arg` "
+        , "where `name` in [evdev, llhook, iokit] and `arg` an extra input for "
+        , "`evdev`, where it is the file to open, and `iokit` where it is the "
+        , "keyboard name. Examples: evdev, evdev:/dev/input/event0, llhook, "
+        , "iokit, iokit:my-kb" ]
+
+-- | Configureable startup delay
+startDelayP :: Parser Ms
+startDelayP = option (fi <$> (auto :: ReadM Int))
+  (  long  "start-delay"
   <> short 's'
-  <> metavar "BUTTON"
-  <> help "Which key to use to emit compose-key sequences"
+  <> value 500
+  <> help  "Number of milliseconds to pause before grabbing the keyboard"
   )
 
--- | Where to emit the output
-oTokenP :: Parser (Maybe DefSetting)
-oTokenP = optional $ SOToken <$> option (tokenParser otokens)
+-- | Full input configuration parser
+inputCfgP :: Parser InputCfg
+inputCfgP = InputCfg <$> inputTokenP <*> startDelayP
+
+{- NOTE: output configuration parsing ------------------------------------------}
+
+-- | Parse a token-name:extra-cfg style string as an output token
+--
+-- Valid values:
+-- - uinput
+-- - uinput:name
+-- - sendkeys
+-- - ext
+outputTokenP :: Parser OutputToken
+outputTokenP = option (maybeReader f)
   (  long "output"
   <> short 'o'
-  <> metavar "OTOKEN"
-  <> help "Emit output to OTOKEN"
+  <> value def
+  <> help h
+  )
+  where
+    f s = case break (== ':') s of
+      ("uinput", "")    -> Just $ Uinput Nothing Nothing
+      ("uinput", ':':s) -> Just $ Uinput (Just $ pack s) Nothing
+      ("sendkeys", "")  -> Just $ SendKeys
+      ("ext", "")       -> Just $ Ext
+      _                 -> Nothing
+    h = mconcat
+        [ "String describing how to simulate the keyboard. Pattern `name:arg` "
+        , "where `name` in [uinput, sendkeys, ext] and `arg` an extra input for "
+        , "uinput only, where it specifies the name of the simulated keybaord. "
+        , "Examples: uinput:mykb, uinput, sendkeys, ext" ]
+
+-- | Parse a delay:rate string as a repeat configuration.
+keyRepeatCfgP :: Parser KeyRepeatCfg
+keyRepeatCfgP = option (maybeReader f)
+  (  long  "key-repeat"
+  <> short 'r'
+  <> value def
+  <> help h
+  )
+  where
+    f s = case break (== ':') s of
+      (a, ':':b) -> do
+        -- NOTE: Here the 'monad' is simply Maybe
+        msa <- (readMaybe a :: Maybe Int)
+        msb <- (readMaybe b :: Maybe Int)
+        pure $ KeyRepeatCfg (fi msa) (fi msb) True
+      _          -> Nothing
+    h = mconcat
+        [ "Pattern `delay:rate` where `delay` is the number of milliseconds "
+        , "before key-repeat starts, and `rate` is the number of milliseconds "
+        , "between repeat events" ]
+
+-- | The full output configuration parser
+outputCfgP :: Parser OutputCfg
+outputCfgP = OutputCfg <$> outputTokenP <*> keyRepeatCfgP
+
+{- NOTE: config-file configuration --------------------------------------------}
+
+-- | Pass a FilePath to a configuration file to load
+parseCfgP :: Parser ParseCfg
+parseCfgP = ParseCfg <$> option (InRoot <$> str)
+  (  long    "config"
+  <> short   'f'
+  <> metavar "FILE"
+  <> value   def
+  <> help    "The kmonad configuration file to load."
   )
 
--- | How to capture the keyboard input
-iTokenP :: Parser (Maybe DefSetting)
-iTokenP = optional $ SIToken <$> option (tokenParser itokens)
-  (  long "input"
-  <> short 'i'
-  <> metavar "ITOKEN"
-  <> help "Capture input via ITOKEN"
-  )
-
--- | Parse a flag that disables auto-releasing the release of enter
-startDelayP :: Parser Ms
-startDelayP = option (fromIntegral <$> megaReadM numP)
-  (  long  "start-delay"
-  <> short 'w'
-  <> value 300
-  <> showDefaultWith (\a -> show $ (fromIntegral a :: Int))
-  <> help  "How many ms to wait before grabbing the input keyboard (time to release enter if launching from terminal)")
-
--- | Experimental flag to trigger discover-mode.
---
--- TODO: turn this into a proper subcommand
---
-expModeP :: Parser Bool
-expModeP = flag False True
-  ( long  "discover" <> short 'q' <> help "Run discover mode")
--- | Transform a bunch of tokens of the form @(Keyword, Parser)@ into an
--- optparse-applicative parser
-tokenParser :: [(Text, P.Parser a)] -> ReadM a
-tokenParser = megaReadM . P.choice . map (P.try . uncurry ((*>) . symbol))
-
--- | Megaparsec <--> optparse-applicative interface
-megaReadM :: P.Parser a -> ReadM a
-megaReadM p = eitherReader (mapLeft show . P.parse p "" . fromString)

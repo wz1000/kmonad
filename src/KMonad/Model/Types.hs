@@ -100,10 +100,10 @@ data BCfg
 -- the model to request shell-commands, but leave the implementation to the
 -- Shell.
 
-data ModelCfg = ModelCfg
+data PullchainCfg = PullchainCfg
   { _keymapCfg   :: Keymap BCfg -- ^ A 'Keymap' of button configurations
   , _firstLayer  :: LayerName   -- ^ What layer to start in
   , _fallThrough :: Bool        -- ^ Whether to let unmapped buttons fall through
   , _mAllowCmd   :: Bool        -- ^ Whether to allow shell-commands
   } deriving Show
-makeClassy ''ModelCfg
+makeClassy ''PullchainCfg

@@ -20,6 +20,8 @@ import KMonad.App.Main.Discover
 
 import qualified RIO.Text.Lazy as T
 
+import Text.Pretty.Simple
+
 -- TODO: Fix bad naming of loglevel clashing between Cmd and Logging
 
 {- NOTE:
@@ -35,45 +37,45 @@ and starting the app-loop.
 -- $init
 
 -- | The outermost error handler, pretty-print the exception and exit.
-withHandler :: LUIO m e => Ctx r m ()
-withHandler = mkCtx $ handle h . ($ ())
-  where h e = do
-          logError . pack . displayException $ (e :: SomeException)
-          liftIO exitFailure
+-- withHandler :: LUIO m e => Ctx r m ()
+-- withHandler = mkCtx $ handle h . ($ ())
+--   where h e = do
+--           logError . pack . displayException $ (e :: SomeException)
+--           liftIO exitFailure
 
--- | Initialize all the components of the KMonad app-loop
-withAppEnv :: LUIO m e => AppCfg -> Ctx r m AppEnv
-withAppEnv cfg = do
+-- -- | Initialize all the components of the KMonad app-loop
+-- withAppEnv :: LUIO m e => AppCfg -> Ctx r m AppEnv
+-- withAppEnv cfg = do
 
 
-  -- Acquire the keysource and keysink
-  src <- withKeyInput  $ cfg^.keyInputCfg
-  snk <- withKeyOutput $ cfg^.keyOutputCfg
+--   -- Acquire the keysource and keysink
+--   src <- withKeyInput  $ cfg^.keyInputCfg
+--   snk <- withKeyOutput $ cfg^.keyOutputCfg
 
-  -- Initialize the model with the model config
-  api <- withModel $ cfg^.modelCfg
+--   -- Initialize the model with the model config
+--   api <- withModel $ cfg^.pullchainCfg
 
-  let init = do
-        logDebug $ "Starting KMonad with following Cfg:\n" <> ppRecord cfg
+--   let init = do
+--         logDebug $ "Starting KMonad with following Cfg:\n" <> ppRecord cfg
 
-        lge <- view logEnv
+--         lge <- view logEnv
 
-        -- Wait a bit for the user to release the 'Return' key with which they started
-        -- KMonad. If we don't do this, we run the risk of capturing the keyboard used
-        -- to start KMonad, resulting in a 'stuck' button.
-        wait $ cfg^.startDelay
+--         -- Wait a bit for the user to release the 'Return' key with which they started
+--         -- KMonad. If we don't do this, we run the risk of capturing the keyboard used
+--         -- to start KMonad, resulting in a 'stuck' button.
+--         wait $ cfg^.startDelay
 
-        pure $ AppEnv
-          { _keAppCfg   = cfg
-          , _keLogEnv   = lge
-          , _keySink    = snk
-          , _keySource  = src
-          , _aeModelAPI = api
-          }
+--         pure $ AppEnv
+--           { _keAppCfg   = cfg
+--           , _keLogEnv   = lge
+--           , _keySink    = snk
+--           , _keySource  = src
+--           , _aeModelAPI = api
+--           }
 
-  let cleanup _ = logInfo "Exiting KMonad"
+--   let cleanup _ = logInfo "Exiting KMonad"
 
-  mkCtx $ bracket init cleanup
+--   mkCtx $ bracket init cleanup
 
 
 --------------------------------------------------------------------------------
@@ -92,10 +94,13 @@ withAppEnv cfg = do
 main :: OnlyIO ()
 main = getInvoc >>= run
 
+run :: Invocation -> OnlyIO ()
+run = pPrint
+
 
 -- | Run KMonad using the provided configuration
-startApp :: AppCfg -> OnlyLIO ()
-startApp cfg = runCtx (withHandler >> withOS >> withAppEnv cfg) $ inEnv loop
+-- startApp :: AppCfg -> OnlyLIO ()
+-- startApp cfg = runCtx (withHandler >> withOS >> withAppEnv cfg) $ inEnv loop
 
 -- | Execute the provided 'Cmd'
 --
@@ -108,22 +113,19 @@ startApp cfg = runCtx (withHandler >> withOS >> withAppEnv cfg) $ inEnv loop
 -- Key-Input mode: just print out key-events until interrupted.
 -- Dry-Run mode: change dry-run mode from a flag to a command.
 --
-run :: Invoc -> OnlyIO ()
-run c = do
-  -- FIXME: Make this actually do something instead of constructing a default log-cfg
-  let logcfg = LogCfg (c^.logLvl) stdout Nothing
+-- run :: Invoc -> OnlyIO ()
+-- run c = do
+--   -- FIXME: Make this actually do something instead of constructing a default log-cfg
+--   let logcfg = LogCfg (c^.logLvl) stdout Nothing
 
-  runLog logcfg $ do
-    if c^.discMode
-      then runDiscover
-      else  do
-        cfg <- loadConfig (c^.cfgFile) c -- Load cfg-file and overwrite Invoc settings
-        unless (c^.dryRun) $ startApp cfg
+--   runLog logcfg $ do
+--     if c^.discMode
+--       then runDiscover
+--       else  do
+--         cfg <- loadConfig (c^.cfgFile) c -- Load cfg-file and overwrite Invoc settings
+--         unless (c^.dryRun) $ startApp cfg
 
-newtype Socket m a = Socket { _uSocket :: ( a -> m (), m a ) }
-type KeySocket m = Socket m KeySwitch
+-- newtype Socket m a = Socket { _uSocket :: ( a -> m (), m a ) }
+-- type KeySocket m = Socket m KeySwitch
 
-data KioCfg = LinCfg | WinCfg | MacCfg
-
--- withKeyIO :: MonadUnliftIO m => KioCfg -> (KeySocket m -> m a) -> m a
--- withKeyIO = undefined
+-- data KioCfg = LinCfg | WinCfg | MacCfg

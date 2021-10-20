@@ -6,7 +6,7 @@ import Data.Version
 import KMonad.Prelude
 import KMonad.App.Invocation.Parser
 import KMonad.App.Invocation.TH
-import KMonad.App.Invocation.Types
+import KMonad.App.Types
 import Options.Applicative
 
 import Paths_kmonad (version)
@@ -21,9 +21,9 @@ versioner = infoOption (showVersion version <> ", commit " <> $(gitHash))
   )
 
 -- | Parse 'Invoc' from the evocation of this program
-getInvoc :: OnlyIO Invoc
+getInvoc :: OnlyIO Invocation
 getInvoc = customExecParser (prefs showHelpOnEmpty) $
-  info (invocP <**> versioner <**> helper)
+  info (invocationP <**> versioner <**> helper)
     (  fullDesc
     <> progDesc "Start KMonad"
     <> header   "kmonad - an onion of buttons."

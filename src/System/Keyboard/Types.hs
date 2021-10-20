@@ -499,11 +499,6 @@ having to touch any of the other code.
 
 -------------------------------------------------------------------------------}
 
--- | A key is identified by either its name or some literal keycode.
-data KeyId
-  = NamedKey   Keyname
-  | LiteralKey Keycode
-
 -- | A record describing
 data KeyCongruence = KeyCongruence
   { _keyName        :: Keyname
@@ -511,21 +506,38 @@ data KeyCongruence = KeyCongruence
   , _keyLin         :: Maybe LinKeycode
   , _keyMac         :: Maybe MacKeycode
   , _keyWin         :: Maybe WinKeycode
-  } deriving Show
+  } deriving (Eq, Show)
 makeLenses ''KeyCongruence
 
 newtype KeyTable = KeyTable { _uKeyTable :: [KeyCongruence] }
-  deriving Show
+  deriving (Show, Eq)
+
+-- | Value indicating which key-locale to use.
+data KeyLocale = EnUS | CustomLocale FilePath deriving (Eq, Show)
 
 {- NOTE: Key-repeat types ------------------------------------------------------
 -------------------------------------------------------------------------------}
 
 -- | Settings that describe how to trigger key-repeat events
 data KeyRepeatCfg = KeyRepeatCfg
-  { _repeatDelay :: Int -- ^ How many milliseconds before we start repeating
-  , _repeatRate  :: Int -- ^ How many milliseconds between repeat events
+  { _repeatDelay   :: Int  -- ^ How many milliseconds before we start repeating
+  , _repeatRate    :: Int  -- ^ How many milliseconds between repeat events
+  , _repeatEnabled :: Bool -- ^ Can be used to toggle repeating on and off
   } deriving (Eq, Show)
-makeLenses ''KeyRepeatCfg
+makeClassy ''KeyRepeatCfg
+-- NOTE: I used to work with 'Maybe KeyRepeatCfg' without the 'repeatEnabled'
+-- field, but that made the Default instance finicky. This is slightly less
+-- beautiful, but easier to work with.
+
+instance Default KeyRepeatCfg where
+#if defined mingw32_HOST_OS
+  -- NOTE: On Windows we *need* to provide key-repeat, because it doesn't happen
+  -- automatically. On Linux's virtual console it doesn't either, but that is an
+  -- edgecase that we should leave to users to configure.
+  def = KeyRepeatCfg 300 100 True
+#else
+  def = KeyRepeatCfg 300 100 False
+#endif
 
 -- | Runtime environment for the key-repeat process
 data KeyRepeatEnv = KeyRepeatEnv

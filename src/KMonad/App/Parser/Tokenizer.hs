@@ -34,6 +34,7 @@ where
 
 import KMonad.Prelude hiding (try, bool)
 
+import KMonad.App.Types
 import KMonad.App.Parser.Keycode
 import KMonad.App.Parser.Operations
 import KMonad.App.Parser.Types
@@ -325,27 +326,27 @@ noKeywordButtons =
 -- $defcfg
 
 -- | Parse an input token
-itokenP :: Parser IToken
+itokenP :: Parser InputToken
 itokenP = choice $ map (try . uncurry statement) itokens
 
 -- | Input tokens to parse; the format is @(keyword, how to parse the token)@
-itokens :: [(Text, Parser IToken)]
+itokens :: [(Text, Parser InputToken)]
 itokens =
-  [ ("device-file"   , KDeviceSource <$> (T.unpack <$> textP))
-  , ("low-level-hook", pure KLowLevelHookSource)
-  , ("iokit-name"    , KIOKitSource <$> optional textP)]
+  [ ("device-file"   , Evdev . fmap unpack <$> optional textP)
+  , ("low-level-hook", pure LLHook)
+  , ("iokit-name"    , IOKit <$> optional textP)]
 
 -- | Parse an output token
-otokenP :: Parser OToken
+otokenP :: Parser OutputToken
 otokenP = choice $ map (try . uncurry statement) otokens
 
 -- | Output tokens to parse; the format is @(keyword, how to parse the token)@
-otokens :: [(Text, Parser OToken)]
+otokens :: [(Text, Parser OutputToken)]
 otokens =
-  [ ("uinput-sink"    , KUinputSink <$> lexeme textP <*> lexeme (optional textP) <*> lexeme (optional repCfgP))
-  , ("send-event-sink", KSendEventSink <$> optional (lexeme numP) <*> optional (lexeme numP))
-  , ("dext"           , pure KExtSink)
-  , ("kext"           , pure KExtSink)]
+  [ ("uinput-sink"    , Uinput <$> lexeme (optional textP) <*> lexeme (optional textP))
+  , ("send-event-sink", pure SendKeys)
+  , ("dext"           , pure Ext)
+  , ("kext"           , pure Ext)]
 
 -- | Parse the DefCfg token
 defcfgP :: Parser DefSettings

@@ -75,53 +75,39 @@ import RIO.FilePath
 
 --------------------------------------------------------------------------------
 
-{- NOTE: Different cfgs -------------------------------------------------------}
+{- SECTION: Functionality-specific configurations --------------------------------
 
--- | Configuration options that are required for everything in KMonad
-data GlobalCfg = GlobalCfg
-  { _logLevel    :: LogLevel    -- ^ Logging level
-  , _logSections :: Bool        -- ^ Used to enable section-breaks in logging
-  , _keyTableCfg :: KeyTableCfg -- ^ Table of name-keycode correspondences
-  } deriving (Eq, Show)
-makeClassy ''GlobalCfg
+There are a number of 'functionalities' that KMonad supports. Each of these can
+be initialized independently of the other. We only ever initialize the
+functionalities required for the specific task we've been instructed to carry
+out.
 
-instance Default GlobalCfg where
-  def = GlobalCfg LevelWarn True EnUS
+required for: r -> run, d -> discover, p -> parsetest
+
+| functionality | required for | description                             |
+|---------------+--------------+-----------------------------------------|
+| model         | r            | run a remapping model on keyboard input |
+| input         | rd           | capture keyboard input from OS          |
+| output        | r            | send keyboard output to OS              |
+| basic         | rdp          | logging, keytable                       |
+
+NOTE: we import input and output configuration types from System.Keyboard.
+-------------------------------------------------------------------------------}
+
+{- SUBSECTION: model ----------------------------------------------------------}
 
 -- | Config options pertinent to running a KMonad model
 data ModelCfg = ModelCfg
-  { _cmdAllow    :: Bool    -- ^ Whether to allow KMonad to call shell commands
-  , _fallthrough :: Bool    -- ^ Whether to rethrow uncaught key events
+  { _fallthrough :: Bool    -- ^ Whether to rethrow uncaught key events
   , _composeKey  :: Keyname -- ^ What button to use as a compose-key
   , _macroDelay  :: Ms      -- ^ How long to pause between macro-taps
   } deriving (Eq, Show)
 makeClassy ''ModelCfg
 
-instance Default ModelCfg where
-  def = ModelCfg False True "ralt" 10
+instance Default ModelCfg where def = ModelCfg True "ralt" 10
 
--- | Value describing where to look for a configuration file
--- - InConfig: '$XDG_CONFIG_HOME'/kmonad/filepath
--- - InHome: '$HOME'/filepath
--- - InRoot: filepath
---
--- Note that XDG_CONFIG_HOME on Linux and Mac is usually @~/.config@, on Windows
--- it's %APPDATA% (e.g. C:/Users/<user>/AppData/Roaming).
-data CfgFile = InConfig FilePath | InHome FilePath | InRoot FilePath
-  deriving (Eq, Show)
+{- SECTION: task configs ------------------------------------------------------}
 
-instance Default CfgFile where def = InConfig "keymap.kbd"
-
--- | Config options pertinent to loading and parsing a config file
-newtype ParseCfg = ParseCfg
-  { _cfgFile :: CfgFile -- ^ Path to the file to load
-  } deriving (Eq, Show)
-makeClassy ''ParseCfg
-
-instance Default ParseCfg where
-  def = ParseCfg def
-
-{- NOTE: Different ways to invoke the @kmonad@ command ------------------------}
 
 -- | Config describing how to run @kmonad run@
 --
@@ -133,10 +119,14 @@ data RunCfg = RunCfg
   { _rModelCfg  :: ModelCfg  -- ^ Cfg how the model is run
   , _rInputCfg  :: InputCfg  -- ^ Cfg how to grab input
   , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
-  , _rParseCfg  :: ParseCfg  -- ^ Cfg how to load config file
   } deriving (Eq, Show)
+makeClassy ''RunCfg
 
-instance Default RunCfg where def = RunCfg def def def def
+instance Default RunCfg where def = RunCfg def def def
+
+instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
+instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
+instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 
 -- | Config describing how to run @kmonad discover@
 --
@@ -144,47 +134,82 @@ instance Default RunCfg where def = RunCfg def def def def
 -- 1. Grab KeyI
 -- 2. Maybe parse a config file (to get at KeyI)
 data DiscoverCfg = DiscoverCfg
-  { _dInputCfg  :: InputCfg -- ^ Config how to grab input
-  , _dParseCfg  :: ParseCfg -- ^ Config how to load config
-  , _dumpEnUS   :: Bool     -- ^ Flag indicating whether to dump table
+  { _dInputCfg  :: InputCfg  -- ^ Config how to grab input
+  , _dumpEnUS   :: Bool      -- ^ Flag indicating whether to dump table
   } deriving (Eq, Show)
 makeClassy ''DiscoverCfg
 
-instance Default     DiscoverCfg where def      = DiscoverCfg def def False
+instance Default     DiscoverCfg where def      = DiscoverCfg def False
 instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
 
--- NOTE: 'ParseTest' does not have it own 'ParseTestCfg' because it *only* needs
--- a ParseCfg. If we ever end up including more into ParseTest, we should give
--- it its own cfg like the others.
+{- SECTION: task --------------------------------------------------------------}
 
 -- | The instruction being passed to KMonad
 data Task
-  = Run RunCfg
-  | ParseTest ParseCfg
-  | Discover DiscoverCfg
+  = Run RunCfg           -- ^ Run KMonad as a keyboard remapper
+  | Discover DiscoverCfg -- ^ Print out information about an input device
+  | ParseTest            -- ^ Test if a configuration file parser without error
   deriving (Eq, Show)
+makeClassyPrisms ''Task
 
--- | The full 'Invocation' with which KMonad is called
-data Invocation = Invocation
-  { _iGlobalCfg :: GlobalCfg -- ^ Global configuration settings
-  , _task      :: Task      -- ^ What task we are instructed to perform
+class HasTask a where task :: Lens' a Task
+instance HasTask Task where task = id
+
+-- | Value describing where to look for a configuration file
+-- - InConfig: '$XDG_CONFIG_HOME'/kmonad/filepath
+-- - InHome: '$HOME'/filepath
+-- - InRoot: filepath
+--
+-- Note that XDG_CONFIG_HOME on Linux and Mac is usually @~/.config@, on Windows
+-- it's %APPDATA% (e.g. C:/Users/<user>/AppData/Roaming).
+data CfgFile = InConfig FilePath | InHome FilePath | InRoot FilePath
+  deriving (Eq, Show)
+instance Default CfgFile where def = InConfig "keymap.kbd"
+
+-- | Configuration options that are required for everything in KMonad
+data BasicCfg = BasicCfg
+  { _logLevel    :: LogLevel    -- ^ Logging level
+  , _logSections :: Bool        -- ^ Used to enable section-breaks in logging
+  , _keyTableCfg :: KeyTableCfg -- ^ Table of name-keycode correspondences
+  , _cmdAllow    :: Bool        -- ^ Whether to allow KMonad to call shell commands
+  , _cfgFile     :: CfgFile     -- ^ Where to look for a config file
+  , _bcTask      :: Task        -- ^ The instruction passed to KMonad
   } deriving (Eq, Show)
-makeClassy ''Invocation
+makeClassy ''BasicCfg
 
-instance HasGlobalCfg Invocation where globalCfg = iGlobalCfg
+instance Default BasicCfg where
+  def = BasicCfg
+    { _logLevel    = LevelWarn
+    , _logSections = True
+    , _keyTableCfg = EnUS
+    , _cmdAllow    = False
+    , _cfgFile     = def
+    , _bcTask      = Run def
+    }
+
+instance HasTask BasicCfg where task = bcTask
 
 {- NOTE: global environment ---------------------------------------------------}
 
 -- | The first runtime environment available to all of KMonad
-data GlobalEnv = GlobalEnv
-  { _geInvocation :: Invocation
-  , _geLogEnv     :: LogEnv
-  , _geKeyTable   :: KeyTable
+data BasicEnv = BasicEnv
+  { _geBasicCfg :: BasicCfg
+  , _geLogEnv   :: LogEnv
+  , _geKeyTable :: KeyTable
   }
-makeClassy ''GlobalEnv
+makeClassy ''BasicEnv
 
-instance HasInvocation GlobalEnv where invocation = geInvocation
-instance HasLogEnv     GlobalEnv where logEnv     = geLogEnv
-instance HasKeyTable   GlobalEnv where keyTable   = geKeyTable
+instance HasLogEnv     BasicEnv where logEnv     = geLogEnv
+instance HasKeyTable   BasicEnv where keyTable   = geKeyTable
 
-type CanG m env = (EnvUIO m env, HasKeyTable env, HasLogEnv env, HasGlobalEnv env)
+type CanBasic m env = ( EnvUIO m env, HasKeyTable env
+                      , HasLogEnv env, HasBasicEnv env)
+
+{- NOTE: invocation -----------------------------------------------------------}
+
+-- -- | The full 'Invocation' with which KMonad is called
+-- data Invocation = Invocation
+--   { _iBasicCfg :: BasicCfg -- ^ Basic configuration settings
+--   , _task      :: Task      -- ^ What task we are instructed to perform
+--   } deriving (Eq, Show)
+-- makeClassy ''Invocation

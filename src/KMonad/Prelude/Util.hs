@@ -1,6 +1,7 @@
 {- For helpers that are so ubiquitous I want them everywhere -}
 module KMonad.Prelude.Util
-  ( fi
+  ( u
+  , fi
   , inEnv
   , overMVar
   , reverseMap
@@ -18,6 +19,10 @@ import qualified RIO.Set     as S
 
 --------------------------------------------------------------------------------
 -- $uncategorized
+
+-- | undefined is too long to type when debugging
+u :: a
+u = undefined
 
 -- | Shorthand for fromIntegral
 fi :: (Integral a, Num b) => a -> b

@@ -82,32 +82,33 @@ import qualified RIO.Text as T
 -- 3. Dispatch on the Task
 main :: OnlyIO ()
 main = do
-  invoc <- getInvocation
+  bascfg <- getInvocation
 
   let logcfg = (def :: LogCfg)
-        & logLvl .~ (invoc^.logLevel)
-        & logSep .~ (if invoc^.logSections then line else noSep)
+        & logLvl .~ (bascfg^.logLevel)
+        -- & logLvl .~ LevelDebug
+        & logSep .~ (if bascfg^.logSections then line else noSep)
 
   withLogging logcfg $ \logenv -> runRIO logenv $ do
 
     sepDebug
-    logDebug "Starting KMonad with the following invocation:"
-    logDebug . ppRecord $ invoc
+    logDebug "Starting KMonad with the following configuration:"
+    logDebug . ppRecord $ bascfg
 
-    withKeyTable (invoc^.keyTableCfg) $ \keytbl -> do
+    withKeyTable (bascfg^.keyTableCfg) $ \keytbl -> do
 
-      let gloenv = GlobalEnv
-                { _geInvocation = invoc
+      let basenv = BasicEnv
+                { _geBasicCfg   = bascfg
                 , _geLogEnv     = logenv
                 , _geKeyTable   = keytbl
                 }
 
-      runRIO gloenv . run $ invoc^.task
+      runRIO basenv . run $ bascfg^.task
 
 -- | Run the task
-run :: CanG m env => Task -> m ()
+run :: CanBasic m env => Task -> m ()
 run (Discover  cfg) = runDiscover cfg
-run (ParseTest cfg) = logError "parsetest!"
+run (ParseTest    ) = logError "parsetest!"
 run (Run       cfg) = logError "run!"
 
 

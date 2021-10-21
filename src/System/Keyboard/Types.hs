@@ -589,8 +589,8 @@ instance Default OutputToken where
 
 -- | Full configuration describing how to simulate a keyboard
 data OutputCfg = OutputCfg
-  { _outputToken  :: OutputToken
-  , _mayRepeatCfg :: KeyRepeatCfg
+  { _outputToken :: OutputToken
+  , _repeatCfg   :: Maybe KeyRepeatCfg
   } deriving (Eq, Show)
 makeClassy ''OutputCfg
 

@@ -15,4 +15,4 @@ module KMonad.App.Main
   )
 where
 
-import KMonad.App.Main.Run (main)
+import KMonad.App.Main.Main (main)

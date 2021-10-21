@@ -99,7 +99,9 @@ library
       -- /end-of-module
 
       KMonad.App
+      KMonad.App.Cfg.Types
       KMonad.App.Main
+      KMonad.App.Main.Main
       KMonad.App.Main.Discover
       KMonad.App.Main.OS
       KMonad.App.Main.Run

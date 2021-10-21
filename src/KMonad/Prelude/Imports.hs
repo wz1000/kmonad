@@ -7,7 +7,11 @@ where
 import Control.Arrow           as X (left, right)
 import Control.Exception       as X (throw)
 import Control.Exception.Lens  as X
-import Control.Lens            as X
+
+import Control.Lens as X hiding
+  ( -- Never needed these, and I would like the names available
+    Setting, setting  )
+
 import Control.Monad.Cont      as X
 import Data.Default            as X
 import RIO.Text                as X (unlines, lines, unpack, pack)

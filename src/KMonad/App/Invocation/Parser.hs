@@ -5,12 +5,16 @@ where
 import KMonad.Prelude
 
 import KMonad.App.Types
+import KMonad.Util.Name
 import KMonad.Util.Time
 import System.Keyboard hiding (switch)
 
 import Data.Monoid (Endo(..))
 import Options.Applicative
 import qualified RIO.Text as T
+
+
+import KMonad.App.Cfg.Types
 
 {- NOTE: Notes to the programmer ----------------------------------------------
 
@@ -49,11 +53,11 @@ fine-grained control, but provide -v as shorthand for --log-level debug.)
 {- SUBSECTION: the P type -----------------------------------------------------}
 
 -- | The type of a parser that produces an Endo (a -> a) on some type
-type P a = Parser (Endo a)
+type P c = Parser (Change c)
 
 -- | Run a 'P' by applying all Endo's to some default value
 pRun :: Default a => P a -> Parser a
-pRun = fmap (`appEndo` def)
+pRun = fmap (`appChange` def)
 
 -- | Turn a bunch of P's into a single P by applying each edit in order.
 pConcat :: [P a] -> P a
@@ -61,22 +65,46 @@ pConcat ps = mconcat <$> sequenceA ps
 
 -- | Lift a P in a to a P in s by lifting the endo using a lens
 pLift :: Lens' s a -> P a -> P s
-pLift l = fmap (liftEndo l)
-  where liftEndo l = Endo . over l . appEndo
+pLift l = fmap (liftChange l)
+
+{- SUBSECTION: Setting transformers -------------------------------------------}
+
+-- | Automatically create a command-line option from a 'mkOption' value
+--
+-- Note that in regards to the 'Mod' fields we:
+-- * set the value to Nothing (important for our endo mechanism)
+-- * set the long name to the Option's name
+-- * set the help to the Options's description
+--
+-- Other mods can still be passed, namely 'short' and 'metavar'
+fromOption :: Option c a -> ReadM a -> Mod OptionFields (Maybe a) -> P c
+fromOption o r m = maybe mempty (runOption o) <$> p
+  where p = option (Just <$> r)
+          (  m
+          <> value Nothing
+          <> long (unpack $ o^.name)
+          <> help (unpack $ o^.description))
+
+-- | Automatically create a command-line flag from a 'mkFlag' value
+--
+-- Note that we set the long-name to the Flag's name. Other mods can still be
+-- provided, e.q. short, meta, help.
+fromFlag :: Flag c -> Mod FlagFields (Change c) -> P c
+fromFlag s = flag mempty (runFlag s)
 
 {- SUBSECTION: P smart constructors -------------------------------------------}
 
 -- | Create a P that sets a lens to a value
-setL :: Lens' cfg a -> Parser (Maybe a) -> P cfg
-setL l p = maybe mempty (Endo . set l)  <$> p
+-- setL :: Lens' cfg a -> Parser (Maybe a) -> P cfg
+-- setL l p = maybe mempty (Endo . set l)  <$> p
 
 -- | Create a P that toggles a boolean value in BasicCfg
-toggleL :: Lens' cfg Bool -> Parser Bool -> P cfg
-toggleL l p = bool mempty (Endo $ over l not) <$> p
+-- toggleL :: Lens' cfg Bool -> Parser Bool -> P cfg
+-- toggleL l p = bool mempty (Endo $ over l not) <$> p
 
 -- | Create a P that on a flag triggering does some change to a cfg
-onFlag :: (cfg -> cfg) -> Mod FlagFields (Endo cfg) -> P cfg
-onFlag f = flag mempty (Endo $ \cfg -> f cfg)
+-- onFlag :: (cfg -> cfg) -> Mod FlagFields (Endo cfg) -> P cfg
+-- onFlag f = flag mempty (Endo $ \cfg -> f cfg)
 
 {- SUBSECTION: shorthand ------------------------------------------------------}
 
@@ -95,280 +123,200 @@ int = auto
 
 -- | Parse the full 'BasicCfg' from the command-line invocation
 invocationP :: Parser BasicCfg
-invocationP = pRun . pConcat $ [basicCfgP, taskP]
+invocationP = pRun . pConcat $ [basicCfgP] -- pRun . pConcat $ [basicCfgP, taskP]
 
 -- | Parser that configures the tas
-taskP :: P BasicCfg
-taskP = hsubparser
-  (  command "run"
-    (info runP
-     (progDesc "Run a keyboard remapping."))
-  <> command "parse-test"
-    (info parseTestP
-     (progDesc "Check a config-file's syntax." ))
-  <> command "discover"
-    (info discoverP
-     (progDesc "Print out what we know about key-presses." ))
-  )
+-- taskP :: P BasicCfg
+-- taskP = hsubparser
+--   (  command "run"
+--     (info runP
+--      (progDesc "Run a keyboard remapping."))
+--   <> command "parse-test"
+--     (info parseTestP
+--      (progDesc "Check a config-file's syntax." ))
+--   <> command "discover"
+--     (info discoverP
+--      (progDesc "Print out what we know about key-presses." ))
+--   )
 
 -- | Parser that configures and sets KMonad to 'run' a model
-runP :: P BasicCfg
-runP = pConcat [setL task wrapped, basicCfgP]
-  where
-    wrapped :: Parser (Maybe Task)
-    wrapped = Just . Run <$> pRun runCfgP
+-- runP :: P BasicCfg
+-- runP = pConcat [setL task wrapped, basicCfgP]
+--   where
+--     wrapped :: Parser (Maybe Task)
+--     wrapped = Just . Run <$> pRun runCfgP
 
-    runCfgP = pConcat [ pLift modelCfg  modelCfgP
-                      , pLift inputCfg  inputCfgP
-                      , pLift outputCfg outputCfgP ]
+--     runCfgP = pConcat [ pLift modelCfg  modelCfgP
+--                       , pLift inputCfg  inputCfgP
+--                       , pLift outputCfg outputCfgP ]
 
 -- | Parser that configures and sets KMonad to 'parse-test' a file
-parseTestP :: P BasicCfg
-parseTestP = pConcat [setL task (pure $ Just ParseTest), basicCfgP]
+-- parseTestP :: P BasicCfg
+-- parseTestP = pConcat [setL task (pure $ Just ParseTest), basicCfgP]
 
 -- | Parser that configures and sets KMonad to 'discover' key input
-discoverP :: P BasicCfg
-discoverP = pConcat [setL task wrapped, basicCfgP]
-  where
-    wrapped :: Parser (Maybe Task)
-    wrapped = Just . Discover <$> pRun discoverCfgP
+-- discoverP :: P BasicCfg
+-- discoverP = pConcat [setL task wrapped, basicCfgP]
+--   where
+--     wrapped :: Parser (Maybe Task)
+--     wrapped = Just . Discover <$> pRun discoverCfgP
 
-    discoverCfgP  = pConcat [ pLift inputCfg inputCfgP, dumpKeyTableP ]
+--     discoverCfgP  = pConcat [ pLift inputCfg inputCfgP, dumpKeyTableP ]
 
 -- | A flag to the `discover` command to print out the 'KeyTable' and exit.
-dumpKeyTableP :: P DiscoverCfg
-dumpKeyTableP = onFlag (set dumpKeyTable True)
-  (  long "dump-table"
-  <> help "If provided, print the standard keytable and exit")
+-- dumpKeyTableP :: P DiscoverCfg
+-- dumpKeyTableP = onFlag (set dumpKeyTable True)
+--   (  long "dump-table"
+--   <> help "If provided, print the standard keytable and exit")
 
 {- SUBSECTION: BasicCfg options -----------------------------------------------}
 
--- | Parse global configuration options available to every subcommand
+
 basicCfgP :: P BasicCfg
 basicCfgP = pConcat
-  [ cfgFileP, logLevelP, toggleSectionsP, keyTableP, verboseP
-  , cmdAllowP, cmdForbidP ]
+  [ -- Options
+    fromOption optCfgFile  jstStr (short 'f' <> metavar "FILE")
+  , fromOption optLogLevel logLvl (short 'l')
+  , fromOption optKeyTable tblStr (short 'k')
 
--- | Pass a FilePath to a configuration file to load
-cfgFileP :: P BasicCfg
-cfgFileP = setL cfgFile wrapped
-  where wrapped :: Parser (Maybe CfgFile)
-        wrapped = option (Just . InRoot <$> str)
-          (  long    "config"
-          <> short   'f'
-          <> metavar "FILE"
-          <> value   Nothing
-          <> help    "The kmonad configuration file to load."
-          )
-
--- | The log-level of either error, warn, info, or debug
-logLevelP :: P BasicCfg
-logLevelP = setL logLevel nested
+    -- Flags
+  , fromFlag flagVerbose     (short 'v')
+  , fromFlag flagSectionsOff mempty
+  , fromFlag flagSectionsOn  mempty
+  , fromFlag flagCommandsOn  mempty
+  , fromFlag flagCommandsOff (short 's')
+  ]
   where
-    nested :: Parser (Maybe LogLevel)
-    nested = option f
-      (  long    "log-level"
-      <> short   'l'
-      <> value   Nothing
-      <> help    "Logging verbosity (debug > info > warn > error)" )
-      where
-        f = fmap Just . maybeReader $ flip lookup
-              [ ("debug", LevelDebug), ("warn", LevelWarn)
-              , ("info",  LevelInfo),  ("error", LevelError) ]
-
--- | A flag that toggles log-section usage.
-toggleSectionsP :: P BasicCfg
-toggleSectionsP = toggleL logSections nested
-  where
-    nested :: Parser Bool
-    nested = switch
-      (  long "toggle-sections"
-      <> help "toggle the usage of section separators in logging output")
-
--- | A path to a file to load the key-table from
-keyTableP :: P BasicCfg
-keyTableP = setL keyTableCfg nested
-  where
-    nested :: Parser (Maybe KeyTableCfg)
-    nested = option (Just . CustomTable <$> str)
-      (  long  "key-table"
-      <> short 'T'
-      <> value Nothing
-      <> help  "Custom keyname table file to use instead of KMonad default."
-      )
-
--- | Verbose flag, for simplicity
-verboseP :: P BasicCfg
-verboseP = onFlag (set logLevel LevelDebug)
-  (  short 'v'
-  <> help  "verbose, same as -l debug"
-  )
-
--- | Flag that, when passed, enables shell command execution by KMonad
-cmdAllowP :: P BasicCfg
-cmdAllowP = onFlag (set cmdAllow True)
-  (  long  "cmd-allow"
-  <> help  "Enable shell-command execution in KMonad"
-  )
-
--- | Flag that, when passed, disables shell command execution by KMonad
-cmdForbidP :: P BasicCfg
-cmdForbidP = onFlag (set cmdAllow False)
-  (  long  "cmd-forbid"
-  <> help  "Disable shell-command execution in KMonad"
-  )
+    jstStr = Just <$> str
+    tblStr = CustomTable <$> str
+    logLvl = maybeReader $ flip lookup
+        [ ("debug", LevelDebug), ("warn", LevelWarn)
+        , ("info",  LevelInfo),  ("error", LevelError) ]
 
 {- SUBSECTION: ModelCfg options -----------------------------------------------}
 
 modelCfgP :: P ModelCfg
 modelCfgP = pConcat
-  [fallthroughAllowP, fallthroughForbidP, composeKeyP, macroDelayP]
+  [ -- Options
+    fromOption optComposeKey (pack <$> str) (metavar "KEYNAME")
+  , fromOption optMacroDelay ms             mempty
 
--- | Flag that, when passed, disables uncaught event rethrowing.
-fallthroughForbidP :: P ModelCfg
-fallthroughForbidP = onFlag (set fallthrough False)
-  (  long  "fallthrough-forbid"
-  <> help  "Disable rethrowing uncaught events"
-  )
+    -- Flags
+  , fromFlag flagFallthroughOff mempty
+  , fromFlag flagFallthroughOn  mempty
+  ]
 
--- | Flag that, when passed, disables uncaught event rethrowing.
-fallthroughAllowP :: P ModelCfg
-fallthroughAllowP = onFlag (set fallthrough True)
-  (  long  "fallthrough-allow"
-  <> help  "Disable rethrowing uncaught events"
-  )
+-- {- SUBSECTION: InputCfg options -----------------------------------------------}
 
--- | Passable option to change compose key
-composeKeyP :: P ModelCfg
-composeKeyP = setL composeKey wrapped
-  where wrapped :: Parser (Maybe Keyname)
-        wrapped = option (Just <$> str)
-          (  long  "compose"
-          <> value Nothing
-          <> help  "Key to use for compose-key macro-sequences."
-          )
+-- -- | Full input configuration parser
+-- inputCfgP :: P InputCfg
+-- inputCfgP = pConcat [ inputTokenP, startDelayP ]
 
--- | Passable option to change macro-delay
-macroDelayP :: P ModelCfg
-macroDelayP = setL macroDelay wrapped
-  where wrapped :: Parser (Maybe Ms)
-        wrapped = option (Just <$> ms)
-          (  long  "macro-delay"
-          <> value  Nothing
-          <> help  "Number of milliseconds to pause between keypresses in macros"
-          )
+-- {-| Parse a token-name:extra-cfg style string as an input token
 
-{- SUBSECTION: InputCfg options -----------------------------------------------}
+-- Valid values:
+-- - evdev
+-- - evdev:/path/to/file
+-- - llhook
+-- - iokit
+-- - iokit:name-pattern -}
+-- inputTokenP :: P InputCfg
+-- inputTokenP = setL inputToken wrapped
+--   where
+--     wrapped :: Parser (Maybe InputToken)
+--     wrapped = option (Just <$> maybeReader f)
+--       (  long  "input"
+--       <> short 'i'
+--       <> value Nothing
+--       <> help  h
+--       )
+--     f s = case break (== ':') s of
+--       ("evdev", "")    -> Just $ Evdev (EvdevCfg Nothing)
+--       ("evdev", ':':s) -> Just $ Evdev (EvdevCfg (Just s))
+--       ("llhook", "")   -> Just $ LLHook
+--       ("iokit", "")    -> Just $ IOKit
+--       _                -> Nothing
+--     h = mconcat
+--         [ "String describing how to capture the keyboard. Pattern: `name:arg` "
+--         , "where `name` in [evdev, llhook, iokit] and `arg` an extra input for "
+--         , "`evdev`, where it is the file to open, and `iokit` where it is the "
+--         , "keyboard name. Examples: evdev, evdev:/dev/input/event0, llhook, "
+--         , "iokit, iokit:my-kb" ]
 
--- | Full input configuration parser
-inputCfgP :: P InputCfg
-inputCfgP = pConcat [ inputTokenP, startDelayP ]
+-- -- | Configureable startup delay
+-- startDelayP :: P InputCfg
+-- startDelayP = setL startDelay wrapped
+--   where wrapped :: Parser (Maybe Int)
+--         wrapped = option (Just <$> int)
+--           (  long  "start-delay"
+--           <> short 's'
+--           <> value Nothing
+--           <> help  "Number of milliseconds to pause before grabbing the keyboard"
+--           )
 
-{-| Parse a token-name:extra-cfg style string as an input token
+-- {- SUBSECTION: OutputCfg options ----------------------------------------------}
 
-Valid values:
-- evdev
-- evdev:/path/to/file
-- llhook
-- iokit
-- iokit:name-pattern -}
-inputTokenP :: P InputCfg
-inputTokenP = setL inputToken wrapped
-  where
-    wrapped :: Parser (Maybe InputToken)
-    wrapped = option (Just <$> maybeReader f)
-      (  long  "input"
-      <> short 'i'
-      <> value Nothing
-      <> help  h
-      )
-    f s = case break (== ':') s of
-      ("evdev", "")    -> Just $ Evdev (EvdevCfg Nothing)
-      ("evdev", ':':s) -> Just $ Evdev (EvdevCfg (Just s))
-      ("llhook", "")   -> Just $ LLHook
-      ("iokit", "")    -> Just $ IOKit
-      _                -> Nothing
-    h = mconcat
-        [ "String describing how to capture the keyboard. Pattern: `name:arg` "
-        , "where `name` in [evdev, llhook, iokit] and `arg` an extra input for "
-        , "`evdev`, where it is the file to open, and `iokit` where it is the "
-        , "keyboard name. Examples: evdev, evdev:/dev/input/event0, llhook, "
-        , "iokit, iokit:my-kb" ]
+-- -- | The full output configuration parser
+-- outputCfgP :: P OutputCfg
+-- outputCfgP = pConcat [ outputTokenP, keyRepeatCfgP ]
 
--- | Configureable startup delay
-startDelayP :: P InputCfg
-startDelayP = setL startDelay wrapped
-  where wrapped :: Parser (Maybe Int)
-        wrapped = option (Just <$> int)
-          (  long  "start-delay"
-          <> short 's'
-          <> value Nothing
-          <> help  "Number of milliseconds to pause before grabbing the keyboard"
-          )
+-- {- | Parse a token-name:extra-cfg style string as an output token
 
-{- SUBSECTION: OutputCfg options ----------------------------------------------}
+-- Valid values:
+-- - uinput
+-- - uinput:name
+-- - sendkeys
+-- - ext -}
+-- outputTokenP :: P OutputCfg
+-- outputTokenP = setL outputToken wrapped
+--   where
+--     wrapped :: Parser (Maybe OutputToken)
+--     wrapped = option (Just <$> maybeReader f)
+--       (  long "output"
+--       <> short 'o'
+--       <> value Nothing
+--       <> help h
+--       )
 
--- | The full output configuration parser
-outputCfgP :: P OutputCfg
-outputCfgP = pConcat [ outputTokenP, keyRepeatCfgP ]
+--     f s = case break (== ':') s of
+--       ("uinput", "")    -> Just $ Uinput Nothing Nothing
+--       ("uinput", ':':s) -> Just $ Uinput (Just $ pack s) Nothing
+--       ("sendkeys", "")  -> Just $ SendKeys
+--       ("ext", "")       -> Just $ Ext
+--       _                 -> Nothing
 
-{- | Parse a token-name:extra-cfg style string as an output token
+--     h = mconcat
+--         [ "String describing how to simulate the keyboard. Pattern `name:arg` "
+--         , "where `name` in [uinput, sendkeys, ext] and `arg` an extra input for "
+--         , "uinput only, where it specifies the name of the simulated keybaord. "
+--         , "Examples: uinput:mykb, uinput, sendkeys, ext" ]
 
-Valid values:
-- uinput
-- uinput:name
-- sendkeys
-- ext -}
-outputTokenP :: P OutputCfg
-outputTokenP = setL outputToken wrapped
-  where
-    wrapped :: Parser (Maybe OutputToken)
-    wrapped = option (Just <$> maybeReader f)
-      (  long "output"
-      <> short 'o'
-      <> value Nothing
-      <> help h
-      )
+-- -- | Parse a delay:rate string as a repeat configuration.
+-- keyRepeatCfgP ::  P OutputCfg
+-- keyRepeatCfgP = setL repeatCfg wrapped
+--   where
+--     -- Note that 'repeatCfg' itself is a 'Maybe KeyRepeatCfg', therefore we have
+--     -- doubly Maybe vaues. The outer Maybe indicates whether an endo should be
+--     -- applied, the inner maybe gets written into the config.
+--     wrapped :: Parser (Maybe (Maybe KeyRepeatCfg))
+--     wrapped = option (Just . Just <$> maybeReader f)
+--       (  long  "key-repeat"
+--       <> short 'r'
+--       <> value Nothing
+--       <> help h
+--       )
 
-    f s = case break (== ':') s of
-      ("uinput", "")    -> Just $ Uinput Nothing Nothing
-      ("uinput", ':':s) -> Just $ Uinput (Just $ pack s) Nothing
-      ("sendkeys", "")  -> Just $ SendKeys
-      ("ext", "")       -> Just $ Ext
-      _                 -> Nothing
+--     -- We also have Maybe's here, but they signal whether the parse succeeded or
+--     -- not. If end up returning Nothing here, then the user specified a bad input
+--     f s = case break (== ':') s of
+--       (a, ':':b) -> do
+--         -- NOTE: Here the 'monad' is simply Maybe
+--         msa <- (readMaybe a :: Maybe Int)
+--         msb <- (readMaybe b :: Maybe Int)
+--         pure $ KeyRepeatCfg (fi msa) (fi msb) True
+--       _          -> Nothing
 
-    h = mconcat
-        [ "String describing how to simulate the keyboard. Pattern `name:arg` "
-        , "where `name` in [uinput, sendkeys, ext] and `arg` an extra input for "
-        , "uinput only, where it specifies the name of the simulated keybaord. "
-        , "Examples: uinput:mykb, uinput, sendkeys, ext" ]
-
--- | Parse a delay:rate string as a repeat configuration.
-keyRepeatCfgP ::  P OutputCfg
-keyRepeatCfgP = setL repeatCfg wrapped
-  where
-    -- Note that 'repeatCfg' itself is a 'Maybe KeyRepeatCfg', therefore we have
-    -- doubly Maybe vaues. The outer Maybe indicates whether an endo should be
-    -- applied, the inner maybe gets written into the config.
-    wrapped :: Parser (Maybe (Maybe KeyRepeatCfg))
-    wrapped = option (Just . Just <$> maybeReader f)
-      (  long  "key-repeat"
-      <> short 'r'
-      <> value Nothing
-      <> help h
-      )
-
-    -- We also have Maybe's here, but they signal whether the parse succeeded or
-    -- not. If end up returning Nothing here, then the user specified a bad input
-    f s = case break (== ':') s of
-      (a, ':':b) -> do
-        -- NOTE: Here the 'monad' is simply Maybe
-        msa <- (readMaybe a :: Maybe Int)
-        msb <- (readMaybe b :: Maybe Int)
-        pure $ KeyRepeatCfg (fi msa) (fi msb) True
-      _          -> Nothing
-
-    h = mconcat
-        [ "Pattern `delay:rate` where `delay` is the number of milliseconds "
-        , "before key-repeat starts, and `rate` is the number of milliseconds "
-        , "between repeat events" ]
+--     h = mconcat
+--         [ "Pattern `delay:rate` where `delay` is the number of milliseconds "
+--         , "before key-repeat starts, and `rate` is the number of milliseconds "
+--         , "between repeat events" ]

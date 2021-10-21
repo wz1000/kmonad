@@ -155,25 +155,14 @@ makeClassyPrisms ''Task
 class HasTask a where task :: Lens' a Task
 instance HasTask Task where task = id
 
--- | Value describing where to look for a configuration file
--- - InConfig: '$XDG_CONFIG_HOME'/kmonad/filepath
--- - InHome: '$HOME'/filepath
--- - InRoot: filepath
---
--- Note that XDG_CONFIG_HOME on Linux and Mac is usually @~/.config@, on Windows
--- it's %APPDATA% (e.g. C:/Users/<user>/AppData/Roaming).
-data CfgFile = InConfig FilePath | InHome FilePath | InRoot FilePath
-  deriving (Eq, Show)
-instance Default CfgFile where def = InConfig "keymap.kbd"
-
 -- | Configuration options that are required for everything in KMonad
 data BasicCfg = BasicCfg
-  { _logLevel    :: LogLevel    -- ^ Logging level
-  , _logSections :: Bool        -- ^ Used to enable section-breaks in logging
-  , _keyTableCfg :: KeyTableCfg -- ^ Table of name-keycode correspondences
-  , _cmdAllow    :: Bool        -- ^ Whether to allow KMonad to call shell commands
-  , _cfgFile     :: CfgFile     -- ^ Where to look for a config file
-  , _bcTask      :: Task        -- ^ The instruction passed to KMonad
+  { _logLevel    :: LogLevel       -- ^ Logging level
+  , _logSections :: Bool           -- ^ Used to enable section-breaks in logging
+  , _keyTableCfg :: KeyTableCfg    -- ^ Table of name-keycode correspondences
+  , _cmdAllow    :: Bool           -- ^ Whether to allow KMonad to call shell commands
+  , _cfgFile     :: Maybe FilePath -- ^ Where to look for a config file
+  , _bcTask      :: Task           -- ^ The instruction passed to KMonad
   } deriving (Eq, Show)
 makeClassy ''BasicCfg
 
@@ -183,7 +172,7 @@ instance Default BasicCfg where
     , _logSections = True
     , _keyTableCfg = EnUS
     , _cmdAllow    = False
-    , _cfgFile     = def
+    , _cfgFile     = Nothing
     , _bcTask      = Run def
     }
 

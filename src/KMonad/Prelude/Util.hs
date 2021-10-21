@@ -1,6 +1,7 @@
 {- For helpers that are so ubiquitous I want them everywhere -}
 module KMonad.Prelude.Util
   ( u
+  , pp
   , fi
   , inEnv
   , overMVar
@@ -8,11 +9,15 @@ module KMonad.Prelude.Util
   , duplicates
 
   , untilJust
+
+  , uncurry3
   )
 where
 
 import KMonad.Prelude.Imports
 import KMonad.Prelude.Types
+
+import Text.Pretty.Simple (pPrint)
 
 import qualified RIO.HashMap as M
 import qualified RIO.Set     as S
@@ -23,6 +28,10 @@ import qualified RIO.Set     as S
 -- | undefined is too long to type when debugging
 u :: a
 u = undefined
+
+-- | useful to pretty-print a record when debugging
+pp :: (MonadIO m, Show a) => a -> m ()
+pp = pPrint
 
 -- | Shorthand for fromIntegral
 fi :: (Integral a, Num b) => a -> b
@@ -61,3 +70,6 @@ untilJust go = go >>= \case
   Just a  -> pure a
 
 --------------------------------------------------------------------------------
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (a, b, c) = f a b c

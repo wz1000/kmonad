@@ -1,0 +1,167 @@
+# This is a comment
+# Welcome to my notes
+# Comments are literal text
+
+# You can insert comments into any non-note textfile by using the following
+
+syntax: universal '-- < ' as-comment
+description: Look how it resembles a branch, nestled on the trunk of the left-margin
+
+# The starting point of any note is './initial.note' where './' signifies the
+  root of that project.
+
+# NOTE: See how indentation preserves across indent? That is `n-file` syntax,
+  where `n-file` is some parser across the language of note-taking.
+
+# Now I am going to leave the initial note, because I would like to preserve
+  initial as official. Everything after this point is purely experimental, and
+  liable to change.
+
+branch: david
+# Everything after this point until end of file is now 'branch: david'
+# Everything after the next line will be plain text
+drop-all:
+
+Phew...
+
+That stuff is tiring. OK, let's see:
+
+- file-away: syntax-ideas
+syntax: n-file 'branch: ' as-branch
+syntax: n-file 'filename: ' @
+
+That previous statement, it would be great if `- file-away: syntax-ideas` meant
+that on 'note-rewrite' would encounter and recognize:
+- 1 line indicating that we should file away lines as syntax ideas
+- 2 lines of text, with some structure, that get parsed and stored
+- an empty line, breaking syntax
+
+Then we would fall back in `based`.
+
+`based` should be a language that parses as plain text, but recognizes certain
+ universal syntax. We declared some above. See:
+
+> -- syntax: universal '-- <' as-comment
+
+Let's look at the previous line:
+'> -- '       introduces `based` syntax into a universal file
+'syntax: '    opens the idea that the rest is a syntax proposal
+'universal: ' the syntax should apply universally, to all files
+'-- < '       some syntax pattern to introduce
+as-comment    a `based` concept of the abstract comment, raw text at some point.
+
+Why did I use `> -- ` above? Because I was introducing a method of referencing
+syntax we defined above. Now I can go to `based` in any code file, by parsing
+these files and extracting (content, point, revision) of matching syntax elements.
+
+...
+
+What other syntax did I see above?
+1.
+# for comments. So '.note' files are syntax first.
+
+2.
+below, I seem to have left a few `_also:`s These seem to be footnotes. Maybe I
+should have a way to capture, hide, and reinsert them?
+
+3.
+I seem to be typing a visually spaced list. That seems nice too.
+
+4.
+I should have some auto-whitespace cleanup, maybe:
+  - footnotes should be spaced 1 apart, and kept 10 empty lines away from point?
+
+5.
+Look, you're checking and compiling your notes! Excellent! :-)
+
+6.
+`...` seems to start a new thought
+
+7.
+```` seems to start syntax literals abstractly (i.e. without execution). Note
+the pun, it's actually single tick marks, but since I'm quoting syntax, it is a
+quoted empty quote string.
+
+8.
+I seem to have `branch: `d off into a `david`. This is in preparation for
+contributions. If anyone wants to contribute, there is space at the very top,
+where you can insert your own namespace. even before the first comments, because
+this file begins in note-mode, since its extension is `note`. I am also happy to
+accept contributions on the core language of `.note` on github. For now, it's a
+desolate landscape that's still very empty, but I'd like to start building
+something, and why not keep it open? If one documents it well, it may be
+interesting.
+
+Since I am the only branch, at the moment I don't need my own file, but I will
+soon, so I should implement the ability to:
+- recognize everything after a branch:
+- everything from the statement till eof is part of the branch.
+- new branch statements introduce further branchings on top of current
+- there is no unbranching
+- there is support for folding and inserting, either into new-file or at-point
+- a point can have multiple branches
+- a point is either a point in a file, or a directory
+- a point in a file can only go forward and backward
+- a point in a directory can only go sideways
+- the files in the directory represent new branches
+- so look, here:
+```
+├── ...
+├── initial.note
+├── initial
+│   └── initial.note
+├── ...
+```
+
+This is the current state of a subset of `pwd`, since I just made those
+directories. We are currently in `initial.note` (<-- this is hard, because this
+note can move, it would be great if I could say `pwd` but like.. for reals `pwd`).
+
+To implement that I would need some inline string literal introducing a
+filepath. Maybe?... #/ or #~? It should *really not* clash with common
+programming languages. On the other hand, just make it configurable and let
+other people sort it out. There should be a base syntax table. Of course, that
+table will need some syntax ;-).
+
+It would be really great if I could filter text that I mark as `goofy: ` from
+the github representation of a note-directory. Just do a `based ungoofy`. It
+provides you with a symlink to a directory containing an ungoofy projection of
+the note-project, with a git-repo of access. So you can pull-up an ungoofy
+version of something, and stick it on GitHub, and you have some revision history
+of the ungoofy views you've accessed and how they've changed over the course of
+use.
+
+Then you can autoencrypt your goofy ideas and keep them under version control :p
+Let them see get out of that!
+
+Yah, many goofy ideas... Hahahahaha.
+
+It would be really cool if I could compile these ideas into a bit of a
+project-file (org-mode todos and such), plant the seed, water it, watch it grow.
+I guess this is the seed, neh?
+
+So: what's next?
+I want org-syntax
+<-- ./project.org
+
+Ooh ideas with an extension introduce files.
+Then ideas with an ending slach introduce branches:
+`./project/` would do it, but I don't want to create that just now,
+  so I've marked it with syntax ticks.
+
+^ Notice the indent, it would be great if changing indent was very simple
+  ergonomically. (or automatically smart)
+
+
+
+
+
+
+
+_also:
+what is important? Visual clarity. It should look clean and easy.
+
+_also: why `based`? Because `base syntax` is too abstract. `based` is a bit
+  silly, and thereby catches the eye and helps you see it as its own idea very
+  quickly. No ambiguity.
+_<

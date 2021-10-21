@@ -1,0 +1,102 @@
+#+TITLE: Project
+
+-- < branch: david
+
+* NEXT
+- 1200 pili
+
+* TODO
+- Write a file parser that extracts universal syntax from text
+- Write a file parser that extracts n-lang syntax from text
+- Keep writing documentation and notes
+- Process your notes
+- Disable the spellchecker
+- File away personal notes automatically
+
+* project: Document KMonad
+You've already started, there are many NOTE, SECTION, and SUBSECTION markers
+starting to accumulate. Write something to extract them and compile them to
+docs.
+
+Also: trust in your ability to achieve that task, and start writing in your
+syntax. The documentation for KMonad should be in the syntax.
+
+So, what do we want to explain to people?
+- How to install it and get a running `>>> kmonad` response. (A pulse, as it
+  were).
+- How to invoke it
+- How to configure it
+- How to extend it
+  - What is it doing
+  - How is it going this
+  - Why is it doing it this way?
+
+You write the first bit last, because you can only write that once you've
+finished it, or at least, have frozen the API. You put a pin in it, invest
+effort into the front ent. Get it running and passing all tests, and then you
+can write that bit of documentation.
+
+However, what are you doing, how are you doing it, why are you doing it this
+way? All great questions that deserve their own keyword highlighting. (<- done ;)
+
+So, I guess:
+WHAT:
+I am writing about how I want to write because I find it difficult to write, and
+I am exploring the problem by trying to express a language for my ideas.
+
+HOW:
+By defining a syntax for special files, normal files, and a managing program
+that keeps a pure interpretation and projection of a directory of files into
+some abstract 'note'.
+
+It can then project this note into:
+- code documentation
+- user documentation
+- blog-posts, articles, books, website, etc.
+
+WHY:
+Because I would like to write my documentation as I code, in the file. That way
+the code is well documented. Then I import my notes and export the
+documentation, no extra effort required.
+
+
+
+
+bucket: syntax of: `_@` with `_` opening the context of prefix syntax, and `@`
+the category of literal names? Why? So I can `_./` for files as well. And
+`_@abstract` would open the category of all the things I've referred to as
+abstract.
+
+Is that the category of a note: having been referred to by:?
+
+Is that just the dual of: refers to?
+
+so _@abstract is an idea, a point in the category of ideas.
+
+You really have to meditate soon David.
+
+If you act on skillful intentions,
+  you are going to get good results.
+If you act on unskillful intentions,
+  you are going to get bad results,
+  you are going to suffer.
+
+Learn to make that an article of faith. There is no harm.
+
+
+It is alright for these notes to appear on github, but not on master. It is too
+finicky to keep your personal branch unuploaded or far away from `master`. So
+before you merge, you need to sort out your notes, or at least, exclude the
+notes files from the merge.
+
+It would be cool if I could make KMonad insert text by sending it a message to.
+Like, if kmonad were running, a command of `kmonad echo "some text here"` would
+cause the already running kmonad instance to type out 's o m e t e x t h e r e',
+with some macro-delay.
+
+Boooooonnngggggggggg goes the temple bell...
+Boooonnnnngggggggggg goes the temple bell..
+Boooonnnnngggggggggg goes the temple bell.
+.
+..
+... and so I go with it.

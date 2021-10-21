@@ -67,3 +67,37 @@ runRun _ = logError "Run!"
 --   let cleanup _ = logInfo "Exiting KMonad"
 
 --   mkCtx $ bracket init cleanup
+
+
+
+-- | Run KMonad using the provided configuration
+-- startApp :: AppCfg -> OnlyLIO ()
+-- startApp cfg = runCtx (withHandler >> withOS >> withAppEnv cfg) $ inEnv loop
+
+-- | Execute the provided 'Cmd'
+--
+-- Wrapped in the context of OS-specific tweaks:
+-- 1. Construct the log-func
+-- 2. Parse the config-file
+-- 3. Maybe start KMonad
+--
+-- TODO: This should dispatch more clearly on different tasks, tasks to add:
+-- Key-Input mode: just print out key-events until interrupted.
+-- Dry-Run mode: change dry-run mode from a flag to a command.
+--
+-- run :: Invoc -> OnlyIO ()
+-- run c = do
+--   -- FIXME: Make this actually do something instead of constructing a default log-cfg
+--   let logcfg = LogCfg (c^.logLvl) stdout Nothing
+
+--   runLog logcfg $ do
+--     if c^.discMode
+--       then runDiscover
+--       else  do
+--         cfg <- loadConfig (c^.cfgFile) c -- Load cfg-file and overwrite Invoc settings
+--         unless (c^.dryRun) $ startApp cfg
+
+-- newtype Socket m a = Socket { _uSocket :: ( a -> m (), m a ) }
+-- type KeySocket m = Socket m KeySwitch
+
+-- data KioCfg = LinCfg | WinCfg | MacCfg

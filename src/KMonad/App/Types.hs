@@ -134,8 +134,8 @@ instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 -- 1. Grab KeyI
 -- 2. Maybe parse a config file (to get at KeyI)
 data DiscoverCfg = DiscoverCfg
-  { _dInputCfg  :: InputCfg  -- ^ Config how to grab input
-  , _dumpEnUS   :: Bool      -- ^ Flag indicating whether to dump table
+  { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
+  , _dumpKeyTable :: Bool      -- ^ Flag indicating whether to dump table
   } deriving (Eq, Show)
 makeClassy ''DiscoverCfg
 

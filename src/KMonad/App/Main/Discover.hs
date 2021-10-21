@@ -62,7 +62,7 @@ type D a = RIO DiscEnv a
 {- NOTE: io -------------------------------------------------------------------}
 
 runDiscover :: CanBasic m env => DiscoverCfg -> m ()
-runDiscover cfg = if cfg^.dumpEnUS then logError enUSTableText else do
+runDiscover cfg = if cfg^.dumpKeyTable then logError enUSTableText else do
   logenv <- view logEnv
   keytbl <- view keyTable
   withKeyI (cfg^.inputCfg) $ \ki -> do

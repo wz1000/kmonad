@@ -21,7 +21,6 @@ This module structures configurable settings into a number of categories.
 - model: applicable only when we actually run a model
 - input: applicable for whenever we grab a keyboard
 - output: applicable whenever we simulate a keyboard
-- parse: applicable whenever we parse a config file
 
 Then we specify 3 different commands KMonad can execute, and pass the correct
 'categories' to them by means of a nested record:
@@ -29,14 +28,11 @@ Then we specify 3 different commands KMonad can execute, and pass the correct
 - parse-test: uses only the parse category
 - discover: uses parse and input
 
--------------------------------------------------------------------------------}
-
-{- SECTION: Edits ---------------------------------------------------------------
-The invocation parser is structured in such a way that it doesn't return values
-that then have to be inserted into a configuration, instead, it returns
-functions that map 'BasicCfg -> BasicCfg'. That way default values are all
-specified in 'App.Types', and the argument parser here only describes `edits`
-without ever having to know the full structure.
+We don't specify values that get written into the config, but instead each
+flag/argument specifies some edit or change that gets applied to the default
+structure. That way default values are all specified in 'App.Types', and the
+argument parser here only describes `edits` without ever having to know the full
+structure.
 
 Additionally, this makes it easier to parse global settings (e.g. log-level)
 both before and after the subcommand (i.e. run/parse-test/discover) and unify
@@ -45,36 +41,36 @@ these modifications.
 Additionally, this makes it easier to specify multiple flags that act on the
 same settings and unify these modification. (i.e. allow --log-level for
 fine-grained control, but provide -v as shorthand for --log-level debug.)
+
 -------------------------------------------------------------------------------}
 
+{- SECTION: setup -------------------------------------------------------------}
+
+{- SUBSECTION: the P type -----------------------------------------------------}
+
+-- | The type of a parser that produces an Endo (a -> a) on some type
 type P a = Parser (Endo a)
 
+-- | Run a 'P' by applying all Endo's to some default value
+pRun :: Default a => P a -> Parser a
+pRun = fmap (`appEndo` def)
+
+-- | Turn a bunch of P's into a single P by applying each edit in order.
 pConcat :: [P a] -> P a
 pConcat ps = mconcat <$> sequenceA ps
 
--- | Specify that an 'option' takes a Ms argument
-ms :: ReadM Ms
-ms = fi <$> int
+-- | Lift a P in a to a P in s by lifting the endo using a lens
+pLift :: Lens' s a -> P a -> P s
+pLift l = fmap (liftEndo l)
+  where liftEndo l = Endo . over l . appEndo
 
--- | Specify that an 'option' takes an Int argument
-int :: ReadM Int
-int = auto
-
-{- NOTE: -----------------------------------------------------------------------
-This is how we keep the parsing-logic clean: we keep defining normal parsers
-that parse simple values, except we wrap them in a Just. We use Nothing to
-signal that we should make no alterations to the structure. Then we pass that
-simple parser and a lens to some helper functions that generate our 'P' values.
--------------------------------------------------------------------------------}
+{- SUBSECTION: P smart constructors -------------------------------------------}
 
 -- | Create a P that sets a lens to a value
 setL :: Lens' cfg a -> Parser (Maybe a) -> P cfg
 setL l p = maybe mempty (Endo . set l)  <$> p
 
 -- | Create a P that toggles a boolean value in BasicCfg
---
--- Note that we do not *set* the boolean we get from the parser, instead (when
--- True) it signals us to toggle some boolean value in the cfg.
 toggleL :: Lens' cfg Bool -> Parser Bool -> P cfg
 toggleL l p = bool mempty (Endo $ over l not) <$> p
 
@@ -82,45 +78,26 @@ toggleL l p = bool mempty (Endo $ over l not) <$> p
 onFlag :: (cfg -> cfg) -> Mod FlagFields (Endo cfg) -> P cfg
 onFlag f = flag mempty (Endo $ \cfg -> f cfg)
 
--- | Lift an Endo in a to an Endo s s using a lens
-liftEndo :: Lens' s a -> Endo a -> Endo s
-liftEndo l = Endo . over l . appEndo
+{- SUBSECTION: shorthand ------------------------------------------------------}
 
--- | Lift a P in a to a P in s by lifting the endo
-pLift :: Lens' s a -> P a -> P s
-pLift l = fmap (liftEndo l)
+-- | Make it clean to specify that an 'option' takes a Ms argument
+ms :: ReadM Ms
+ms = fi <$> int
 
-pRun :: Default a => P a -> Parser a
-pRun = fmap (`appEndo` def)
+-- | Make it clean to specify that an 'option' takes an Int argument
+int :: ReadM Int
+int = auto
 
-{- NOTE: top level parser -----------------------------------------------------}
 
--- mkCfg :: Endo BasicCfg -> (Task, Endo BasicCfg) -> BasicCfg
--- mkCfg b1 (t, b2) = (appEndo (b1 <> b2) def) & task .~ t
+{- SECTION: Parsers -----------------------------------------------------------}
 
--- | Return the 'BasicCfg' as specified by the kmonad command-line invocation
--- invocationP :: Parser BasicCfg
--- invocationP = mkCfg <$> basicCfgP <*> taskP
+{- SUBSECTION: Top-level and task parsers -------------------------------------}
 
+-- | Parse the full 'BasicCfg' from the command-line invocation
 invocationP :: Parser BasicCfg
 invocationP = pRun . pConcat $ [basicCfgP, taskP]
 
--- | Parse the command that KMonad is supposed to execute
--- taskP :: P
--- taskP = setL task (Just <$> wrapped)
---   where wrapped :: Parser Task
---         wrapped = hsubparser
---           (  command "run"
---             (info runP
---              (progDesc "Run a keyboard remapping."))
---           <> command "parse-test"
---             (info parseTestP
---              (progDesc "Check a config-file's syntax." ))
---           <> command "discover"
---             (info discoverP
---              (progDesc "Print out what we know about key-presses." ))
---           )
-
+-- | Parser that configures the tas
 taskP :: P BasicCfg
 taskP = hsubparser
   (  command "run"
@@ -133,16 +110,6 @@ taskP = hsubparser
     (info discoverP
      (progDesc "Print out what we know about key-presses." ))
   )
-
-{- Now I need so separate out:
-- setting the task to run
-- global cfg
-- run cfg
-  - input  cfg
-  - output cfg
-  - parse  cfg
-  - etc
--}
 
 -- | Parser that configures and sets KMonad to 'run' a model
 runP :: P BasicCfg
@@ -166,38 +133,15 @@ discoverP = pConcat [setL task wrapped, basicCfgP]
     wrapped :: Parser (Maybe Task)
     wrapped = Just . Discover <$> pRun discoverCfgP
 
-    discoverCfgP  = pConcat [ pLift inputCfg inputCfgP ]
+    discoverCfgP  = pConcat [ pLift inputCfg inputCfgP, dumpKeyTableP ]
 
+-- | A flag to the `discover` command to print out the 'KeyTable' and exit.
+dumpKeyTableP :: P DiscoverCfg
+dumpKeyTableP = onFlag (set dumpKeyTable True)
+  (  long "dump-table"
+  <> help "If provided, print the standard keytable and exit")
 
-
--- runP, parseTestP :: Parser Task
--- runP = pure $ Run def
--- parseTestP = pure $ ParseTest def
-
--- discoverP :: Parser Task
--- discoverP = pure $ Discover def
-
--- -- | Collects all the passable options for a run into a single parser
--- runP :: Parser Task
--- runP = let cfg = RunCfg <$> modelCfgP
---                         <*> inputCfgP
---                         <*> outputCfgP
---                         <*> parseCfgP
---        in Run <$> cfg
-
--- -- | Collects all the passable options for a parse-test into a single parser
--- parseTestP :: Parser Task
--- parseTestP = ParseTest <$> parseCfgP
-
--- -- | Collects all the passable options for a discover run into a single parser
--- discoverP :: Parser Task
--- discoverP = let cfg = DiscoverCfg <$> inputCfgP
---                                   <*> parseCfgP
---                                   <*> globalCfgP
---                                   <*> dumpEnUSP
---             in Discover <$> cfg
-
--- {- NOTE: basic configuration options -----------------------------------------}
+{- SUBSECTION: BasicCfg options -----------------------------------------------}
 
 -- | Parse global configuration options available to every subcommand
 basicCfgP :: P BasicCfg
@@ -274,7 +218,7 @@ cmdForbidP = onFlag (set cmdAllow False)
   <> help  "Disable shell-command execution in KMonad"
   )
 
--- {- NOTE: model configuration options ------------------------------------------}
+{- SUBSECTION: ModelCfg options -----------------------------------------------}
 
 modelCfgP :: P ModelCfg
 modelCfgP = pConcat
@@ -314,21 +258,20 @@ macroDelayP = setL macroDelay wrapped
           <> help  "Number of milliseconds to pause between keypresses in macros"
           )
 
-
-{- NOTE: input configuration parsing ------------------------------------------}
+{- SUBSECTION: InputCfg options -----------------------------------------------}
 
 -- | Full input configuration parser
 inputCfgP :: P InputCfg
 inputCfgP = pConcat [ inputTokenP, startDelayP ]
 
--- | Parse a token-name:extra-cfg style string as an input token
---
--- Valid values:
--- - evdev
--- - evdev:/path/to/file
--- - llhook
--- - iokit
--- - iokit:name-pattern
+{-| Parse a token-name:extra-cfg style string as an input token
+
+Valid values:
+- evdev
+- evdev:/path/to/file
+- llhook
+- iokit
+- iokit:name-pattern -}
 inputTokenP :: P InputCfg
 inputTokenP = setL inputToken wrapped
   where
@@ -363,20 +306,19 @@ startDelayP = setL startDelay wrapped
           <> help  "Number of milliseconds to pause before grabbing the keyboard"
           )
 
-
-{- NOTE: output configuration parsing ------------------------------------------}
+{- SUBSECTION: OutputCfg options ----------------------------------------------}
 
 -- | The full output configuration parser
 outputCfgP :: P OutputCfg
 outputCfgP = pConcat [ outputTokenP, keyRepeatCfgP ]
 
--- | Parse a token-name:extra-cfg style string as an output token
---
--- Valid values:
--- - uinput
--- - uinput:name
--- - sendkeys
--- - ext
+{- | Parse a token-name:extra-cfg style string as an output token
+
+Valid values:
+- uinput
+- uinput:name
+- sendkeys
+- ext -}
 outputTokenP :: P OutputCfg
 outputTokenP = setL outputToken wrapped
   where
@@ -430,10 +372,3 @@ keyRepeatCfgP = setL repeatCfg wrapped
         [ "Pattern `delay:rate` where `delay` is the number of milliseconds "
         , "before key-repeat starts, and `rate` is the number of milliseconds "
         , "between repeat events" ]
-
--- {- NOTE: ungrouped parsers ----------------------------------------------------}
-
--- dumpEnUSP :: Parser Bool
--- dumpEnUSP = switch
---   (  long "dump-table"
---   <> help "If provided, print the standard keytable and exit")

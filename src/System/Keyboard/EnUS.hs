@@ -51,5 +51,6 @@ enUSTableText = T.drop 1 $ [r|
 | 8         |  0x09 | 0x700000025 |    0x38 | 8-key       |
 | 9         |  0x0a | 0x700000026 |    0x39 | 9-key       |
 | 0         |  0x0b | 0x700000027 |    0x30 | 0-key       |
+| esc       |  0x01 | 0x700000029 |    0x1B | Escape      |
 | fn        |     ~ | 0x700000003 |       ~ | Mac Fn key  |
 |]

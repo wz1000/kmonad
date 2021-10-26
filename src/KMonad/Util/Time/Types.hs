@@ -4,6 +4,7 @@ module KMonad.Util.Time.Types
   , _SystemTime, _s, _ns
   , SystemTime(..)
   , Ms(..)
+  , ms
   )
 where
 
@@ -44,6 +45,6 @@ _ns = lens systemNanoseconds (\t ns -> t { systemNanoseconds = ns })
 -- $delay
 
 -- | A vector forward in time, in ms.
-newtype Ms = Ms { unMs :: Int}
+newtype Ms = Ms { _ms :: Int}
   deriving (Eq, Show, Num, Enum, Ord, Real, Integral, Display)
-makeWrapped ''Ms
+makeLenses ''Ms

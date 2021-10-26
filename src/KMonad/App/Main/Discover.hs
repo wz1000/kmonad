@@ -14,6 +14,7 @@ import System.Keyboard.IO
 import qualified RIO.Text as T
 import Text.RawString.QQ
 
+
 {- NOTE: doc ------------------------------------------------------------------}
 
 greeting :: Text
@@ -24,7 +25,7 @@ of the line(s) describing keycode names is:
 name linux mac windows (description of the key)
 
 where:
-- name portable name that will be recognized in the config-file
+- name: portable name that will be recognized in the config-file
 - linux, mac, windows: evaluate as keycode literals, but are not portable
 - description: clarification of what the key is.
 
@@ -32,14 +33,20 @@ A keycode literal of '~' means we have no code for the name on that OS
 
 Please note the following:
 - If a key is not triggering a discovery report, then the event is not reaching
-  KMonad, an we cannot capture it. If under Linux or Mac you can try to see if
+  KMonad, and we cannot capture it. If under Linux or Mac you can try to see if
   this event shows up under another device.
 - The literal keycode will differ between OSes. You can refer to the key by its
   code in your config, but then your config will only work for that 1 OS.
 - If the key has a name, that name *should* refer to the same key across all
-  platforms. If it doesn't: please file an issue on out github page:
+  platforms. If it doesn't: please file an issue on our github page:
   https://github.com/kmonad/kmonad.git
-- We ignore all key-repeat events, these also do not show in discover-mode.
+- KMonad ignores all key-repeat events, therefore these also do not show in
+  discover-mode.
+
+Unless you started `discover` with the `--inescapable` flag, escape (according
+to the currently loaded table) will exit discover mode. If you did use
+`--inescapable`, you're going to have to close this process by closing the
+terminal its running in with your mouse, or unplugging the keyboard.
 
 Waiting for you to press a key:
 |]
@@ -59,22 +66,49 @@ instance HasKeyTable DiscEnv where keyTable = deKeyTable
 
 type D a = RIO DiscEnv a
 
-{- NOTE: io -------------------------------------------------------------------}
+{- SECTION: Exception ---------------------------------------------------------}
+
+data DiscoverException = NoEscapeCode KeyTable
+  deriving Show
+
+instance Exception DiscoverException where
+  -- NOTE: I'd like to print the currently loaded table, but first we need a
+  -- table-to-text export function.
+  displayException (NoEscapeCode _) = concat
+    [ "Could not find a keycode for 'esc' in the current table. Either "
+    , "add a keycode for escape to your table, or pass the `--inescapable` "
+    , "to the discover invocation."
+    ]
+
+{- SECTION: io -------------------------------------------------------------------}
 
 runDiscover :: CanBasic m env => DiscoverCfg -> m ()
 runDiscover cfg = if cfg^.dumpKeyTable then logError enUSTableText else do
+
   logenv <- view logEnv
   keytbl <- view keyTable
-  withKeyI (cfg^.inputCfg) $ \ki -> do
+  esc    <- getCode "esc"
 
+  -- Set up a function to check if a keycode is equal to escape
+  isDone <- case (cfg^.escapeExits, esc) of
+    (False, _)     -> pure $ const False
+    (True, Just c) -> pure $ \s -> (c ==) . (view keycode) $ (s :: KeySwitch)
+    _              -> throwIO (NoEscapeCode keytbl)
+
+  withKeyI (cfg^.inputCfg) $ \ki -> do
     let dscenv = DiscEnv
                    { _deLog      = logenv
                    , _deKeyI     = ki
                    , _deKeyTable = keytbl
                    }
     runRIO dscenv $ do
+
       sepInfo >> logInfo greeting
-      forever (getKey >>= discoverReport)
+      let step = do k <- getKey
+                    discoverReport k
+                    unless (isDone k) step
+      step
+
 
 discoverReport :: KeySwitch -> D ()
 discoverReport s = do

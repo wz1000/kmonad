@@ -8,6 +8,7 @@ import KMonad.Prelude
 import KMonad.App.Invocation.Parser
 import KMonad.App.Invocation.TH
 import KMonad.App.Types
+import KMonad.App.Cfg.Types
 import Options.Applicative
 import Text.RawString.QQ
 
@@ -32,7 +33,7 @@ versioner = infoOption (showVersion version <> ", commit " <> $(gitHash))
   )
 
 -- | Parse exactly how this program was invoked.
-getInvocation :: OnlyIO BasicCfg
+getInvocation :: OnlyIO (Change BasicCfg)
 getInvocation = customExecParser (prefs showHelpOnEmpty) $
   info (invocationP <**> versioner <**> helper)
     (  fullDesc

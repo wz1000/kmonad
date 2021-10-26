@@ -10,6 +10,7 @@ import KMonad.App.Invocation    (getInvocation)
 import KMonad.App.Main.Discover (runDiscover)
 import KMonad.App.Main.Run      (runRun)
 import KMonad.App.Types
+import KMonad.App.Cfg.Types
 
 import System.Keyboard
 import System.Keyboard.IO
@@ -21,7 +22,7 @@ import System.Keyboard.IO
 -- 3. Dispatch on the Task
 main :: OnlyIO ()
 main = do
-  bascfg <- getInvocation
+  bascfg <- runChange <$> getInvocation
 
   let logcfg = (def :: LogCfg)
         & logLvl .~ (bascfg^.logLevel)

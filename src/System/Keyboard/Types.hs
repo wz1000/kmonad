@@ -378,7 +378,7 @@ instance Storable MacPacket where
 
 newtype IOKitCfg = IOKitCfg
   { _productStr :: Maybe Text -- ^ A string to restrict which keyboard to capture
-  } deriving Show
+  } deriving (Eq, Show)
 makeClassy ''IOKitCfg
 
 instance Default IOKitCfg where def = IOKitCfg Nothing
@@ -461,24 +461,22 @@ instance HasKeyTable KeyTable where keyTable = id
 
 -- | Settings that describe how to trigger key-repeat events
 data KeyRepeatCfg = KeyRepeatCfg
-  { _repeatDelay   :: Int  -- ^ How many milliseconds before we start repeating
-  , _repeatRate    :: Int  -- ^ How many milliseconds between repeat events
-  , _repeatEnabled :: Bool -- ^ Can be used to toggle repeating on and off
+  { _repeatDelay :: Int  -- ^ How many milliseconds before we start repeating
+  , _repeatRate  :: Int  -- ^ How many milliseconds between repeat events
   } deriving (Eq, Show)
 makeClassy ''KeyRepeatCfg
--- NOTE: I used to work with 'Maybe KeyRepeatCfg' without the 'repeatEnabled'
--- field, but that made the Default instance finicky. This is slightly less
--- beautiful, but easier to work with.
 
 instance Default KeyRepeatCfg where
 #if defined mingw32_HOST_OS
-  -- NOTE: On Windows we *need* to provide key-repeat, because it doesn't happen
-  -- automatically. On Linux's virtual console it doesn't either, but that is an
-  -- edgecase that we should leave to users to configure.
-  def = KeyRepeatCfg 300 100 True
+  {- NOTE: On Windows we *need* to provide key-repeat, because it doesn't happen
+     automatically. On Linux's virtual console it doesn't either, but that is an
+     edgecase that we should leave to users to configure. -}
+  def = KeyRepeatCfg 300 100
 #else
-  def = KeyRepeatCfg 300 100 False
+  {- NOTE: (maxBound :: Int) ms > 290 millenia... probably enough -}
+  def = KeyRepeatCfg maxBound maxBound
 #endif
+
 
 {- NOTE: General output types -------------------------------------------------
 
@@ -544,12 +542,14 @@ newtype KeyO = KeyO { _uKeyO :: KeySwitch -> IO () }
 -- | All available methods of capturing keyboards
 data InputToken
   = Evdev EvdevCfg -- ^ Linux evdev source with optional FilePath to device
-  | LLHook                 -- ^ Windows low-level keyboard hook
-  | IOKit      -- ^ Mac IOKit source with optional keyboard subset
+  | LLHook         -- ^ Windows low-level keyboard hook
+  | IOKit IOKitCfg -- ^ Mac IOKit source with optional keyboard subset
   deriving (Eq, Show)
 makeClassyPrisms ''InputToken
 
-
+-- | A traversal over the 'Maybe Filepath' in an Evdev value
+evdevDeviceFile :: AsInputToken s => Traversal' s (Maybe FilePath)
+evdevDeviceFile = _Evdev.evdevPath
 
 instance Default InputToken where
 #if defined linux_HOST_OS
@@ -560,6 +560,44 @@ instance Default InputToken where
   def = LLHook
 #endif
 
+{- NOTE:
+
+The Traversal's type below is the same as:
+
+inputSelector :: Applicative f
+  => (Maybe Text -> f (Maybe Text))
+  -> InputToken
+  -> f InputToken
+
+This is just how VanLaarhoven traversals work
+-}
+
+
+-- case i^?_
+--   Just (Evdev (EvdevCfg t)) -> review _Evdev . EvdevCfg
+--     . fmap unpack <$> f (pack <$> t)
+--   _ -> pure i
+
+-- | A traversal over the keyboard-selecting text inside an InputToken.
+--
+-- This can be used to view the selector like this:
+-- >>> token^?inputSelector
+-- Just "/dev/input/blabla"
+--
+-- Or set the selector like this:
+-- >>> token & inputSelector .~ Just "/dev/input/foobar"
+-- <some input token>
+--
+-- On Linux this corresponds to the device-file
+-- On Mac this corresponds to the keyboard-name subset
+-- On windows this is a NoOp
+inputSelector :: AsInputToken s => Traversal' s (Maybe Text)
+inputSelector f i = case i^?_InputToken of
+  Just (IOKit (IOKitCfg t)) -> review _IOKit . IOKitCfg <$> f t
+  Just (Evdev (EvdevCfg t)) -> review _Evdev . EvdevCfg
+    . fmap unpack <$> f (pack <$> t)
+  _ -> pure i
+
 -- | Full configuration describing how to acquire a keyboard
 data InputCfg = InputCfg
   { _inputToken :: InputToken -- ^ Token describing how to acquire the keyboard
@@ -569,18 +607,29 @@ makeClassy ''InputCfg
 
 instance Default InputCfg where def = InputCfg def 200
 
-
 -- | All available methods of simulating keyboards
 data OutputToken
-  = Uinput (Maybe Text) (Maybe Text) -- ^ Linux @uinput@ with name and post-init cmd
-  | SendKeys                         -- ^ Windows @SendKeys@ based event injector
-  | Ext                              -- ^ Mac @dext/kext@ based event injector
+  = Uinput (Maybe Text)  -- ^ Linux @uinput@ with name and post-init cmd
+  | SendKeys             -- ^ Windows @SendKeys@ based event injector
+  | Ext                  -- ^ Mac @dext/kext@ based event injector
   deriving (Eq, Show)
 makeClassyPrisms ''OutputToken
 
+class HasOutputToken a where outputToken :: Lens' a OutputToken
+instance HasOutputToken OutputToken where outputToken = id
+
+-- | A traversal over the keyboard output name
+--
+-- On Linux this corresponds to the name given to the Uinput device. On the
+-- other OSes, this does nothing.
+outputName :: AsOutputToken s => Traversal' s (Maybe Text)
+outputName f i = case i^?_OutputToken of
+  Just (Uinput t) -> review _Uinput <$> f t
+  _               -> pure i
+
 instance Default OutputToken where
 #if defined linux_HOST_OS
-  def = Uinput Nothing Nothing
+  def = Uinput Nothing
 #elif defined darwin_HOST_OS
   def = Ext
 #elif defined mingw32_HOST_OS
@@ -589,13 +638,15 @@ instance Default OutputToken where
 
 -- | Full configuration describing how to simulate a keyboard
 data OutputCfg = OutputCfg
-  { _outputToken :: OutputToken
-  , _repeatCfg   :: Maybe KeyRepeatCfg
+  { _cOutputToken :: OutputToken
+  , _cKeyRepeatCfg   :: KeyRepeatCfg
   } deriving (Eq, Show)
 makeClassy ''OutputCfg
 
-instance Default OutputCfg where
-  def = OutputCfg def def
+instance Default OutputCfg where def = OutputCfg def def
+
+instance HasOutputToken OutputCfg where outputToken = cOutputToken
+instance HasKeyRepeatCfg OutputCfg where keyRepeatCfg = cKeyRepeatCfg
 
 
 

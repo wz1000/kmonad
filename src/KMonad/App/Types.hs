@@ -136,10 +136,11 @@ instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 data DiscoverCfg = DiscoverCfg
   { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
   , _dumpKeyTable :: Bool      -- ^ Flag indicating whether to dump table
+  , _escapeExits  :: Bool      -- ^ Flag indicating whether to exit on escape
   } deriving (Eq, Show)
 makeClassy ''DiscoverCfg
 
-instance Default     DiscoverCfg where def      = DiscoverCfg def False
+instance Default     DiscoverCfg where def      = DiscoverCfg def False True
 instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
 
 {- SECTION: task --------------------------------------------------------------}

@@ -7,6 +7,7 @@ module System.Keyboard.Prelude
   , _fi
   , showHex
   , time0
+  , packed
   )
 where
 
@@ -48,3 +49,7 @@ fi = fromIntegral
 
 _fi :: (Integral a, Num b) => Getter a b
 _fi = to fromIntegral
+
+-- | Iso over packed string representation
+packed :: X.Iso' String Text
+packed = iso X.pack X.unpack

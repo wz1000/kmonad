@@ -17,6 +17,9 @@ lenses.
 
 I want to explain more, but it seems too wordy. Just gonna program for a bit.
 
+NOTE:
+All changes and options are 1-ops. I.e. -> flag (flag thing) == flag thing
+
 -------------------------------------------------------------------------------}
 
 module KMonad.App.Configurable where
@@ -107,11 +110,6 @@ onDef = (`appChange` def)
 liftChange :: Lens' s a -> Change a -> Change s
 liftChange l (Change cs (Endo f)) = Change cs (Endo $ over l f)
 
-{- SUBSECTION: Util -----------------------------------------------------------}
-
--- selecting :: [(Name, a)] ->
-
-
 {- SECTION: Values ------------------------------------------------------------}
 
 {- SUBSECTION: BasicCfg -------------------------------------------------------}
@@ -157,11 +155,6 @@ flagCommandsOff = mkFlag "commands-off" cmdAllow False
   "Disable the execution of external commands (safe-mode)"
 
 {- SUBSECTION: ModelCfg -------------------------------------------------------}
-
--- | Option that sets the compose-key
-optComposeKey :: HasModelCfg c => Option c Keyname
-optComposeKey = mkOption "compose-key" composeKey
-  "The key used to signal the beginning of a compose-sequence to the OS"
 
 -- | Option that sets the time between taps in key-macros
 optMacroDelay :: HasModelCfg c => Option c Ms
@@ -215,6 +208,13 @@ optRepeatRate = mkOption "repeat-rate" (outputCfg.repeatRate.from ms)
 optRepeatDelay :: HasOutputCfg c => Option c Ms
 optRepeatDelay = mkOption "repeat-delay" (outputCfg.repeatDelay.from ms)
   "Set the time before KMonad starts generating key-repeat events"
+
+{- SUBSECTION: ParseCfg -------------------------------------------------------}
+
+-- | Option that sets the compose-key
+optComposeKey :: HasParseCfg c => Option c Keyname
+optComposeKey = mkOption "compose-key" composeKey
+  "The key used to signal the beginning of a compose-sequence to the OS"
 
 {- SUBSECTION: Task-specific settings -----------------------------------------}
 

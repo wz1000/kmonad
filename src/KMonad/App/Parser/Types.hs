@@ -10,35 +10,36 @@ Portability : non-portable (MPTC with FD, FFI to Linux-only c-code)
 
 -}
 module KMonad.App.Parser.Types
-  ( -- * $bsc
-    Parser
-  , PErrors(..)
+  -- ( -- * $bsc
+--     Parser
+--   , PErrors(..)
 
-    -- * $cfg
-  , CfgToken(..)
+--     -- * $cfg
+--   , CfgToken(..)
 
-    -- * $but
-  , DefButton(..)
+--     -- * $but
+--   , DefButton(..)
 
-    -- * $tls
-  , DefSetting(..)
-  , DefSettings
-  , DefAlias
-  , DefLayer(..)
-  , DefSrc
-  , KExpr(..)
+--     -- * $tls
+--   , DefSetting(..)
+--   , DefSettings
+--   , DefAlias
+--   , DefLayer(..)
+--   , DefSrc
+--   , KExpr(..)
 
-    -- * $defio
-  -- , IToken(..)
-  -- , OToken(..)
+--     -- * $defio
+--   -- , IToken(..)
+--   -- , OToken(..)
 
-    -- * $lenses
-  , AsKExpr(..)
-  , AsDefSetting(..)
+--     -- * $lenses
+--   , AsKExpr(..)
+--   , AsDefSetting(..)
 
-    -- * $reexport
-  , module X
-) where
+--     -- * $reexport
+--   , module X
+-- )
+where
 
 
 import KMonad.Prelude
@@ -51,23 +52,48 @@ import KMonad.Pullchain.Types
 -- import KMonad.Keyboard.IO
 import KMonad.Util hiding (Keycode)
 
+import KMonad.App.Configurable
+
 import System.Keyboard hiding (Name)
 
-import Text.Megaparsec      as X
-import Text.Megaparsec.Char as X
+import Text.Megaparsec      hiding (parse)
+import Text.Megaparsec.Char
 
---------------------------------------------------------------------------------
--- $bsc
---
--- The basic types of parsing
+{- SECTION: Types -------------------------------------------------------------}
 
+{- SUBSECTION: Env ------------------------------------------------------------}
 
+-- | The environment we need to run a parser
+data ParseEnv = ParseEnv
+  { _pKeyTable   :: KeyTable
+  , _composeCode :: Keycode
+  } deriving (Eq, Show)
+makeClassy ''ParseEnv
+
+instance HasKeyTable ParseEnv where keyTable = pKeyTable
+
+{- SUBSECTION: Errors ---------------------------------------------------------}
+
+data MyError
+  = UnknownComposeKey Keyname -- ^ Failed to look up the compose key
+  | NoKeycodeFor Keyname      -- ^ Failed to lookup keycode
+  deriving (Eq, Ord, Show)
+
+instance Exception MyError where
+  displayException (NoKeycodeFor n) = "Porque? " <> unpack n
+  displayException (UnknownComposeKey n) = "Pourquoi? " <> unpack n
+
+instance ShowErrorComponent MyError where
+  showErrorComponent = displayException
+
+{- SUBSECTION: 'narrowed' Megaparsec types ------------------------------------}
 
 -- | Parser's operate on Text and carry no state
-type Parser = Parsec Void Text
+-- type Parser = Parsec Void Text
+type P a = ParsecT MyError Text (Reader ParseEnv) a
 
 -- | The type of errors returned by the Megaparsec parsers
-newtype PErrors = PErrors (ParseErrorBundle Text Void)
+newtype PErrors = PErrors (ParseErrorBundle Text MyError)
   deriving Eq
 
 instance Show PErrors where

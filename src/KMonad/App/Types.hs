@@ -99,12 +99,20 @@ NOTE: we import input and output configuration types from System.Keyboard.
 -- | Config options pertinent to running a KMonad model
 data ModelCfg = ModelCfg
   { _fallthrough :: Bool    -- ^ Whether to rethrow uncaught key events
-  , _composeKey  :: Keyname -- ^ What button to use as a compose-key
   , _macroDelay  :: Ms      -- ^ How long to pause between macro-taps
   } deriving (Eq, Show)
 makeClassy ''ModelCfg
 
-instance Default ModelCfg where def = ModelCfg True "ralt" 10
+instance Default ModelCfg where def = ModelCfg True 10
+
+{- SUBSECTION: parse ----------------------------------------------------------}
+
+data ParseCfg = ParseCfg
+  { _composeKey  :: Keyname -- ^ What button to use as a compose-key
+  } deriving (Eq, Show)
+makeClassy ''ParseCfg
+
+instance Default     ParseCfg where def = ParseCfg "ralt"
 
 {- SECTION: task configs ------------------------------------------------------}
 
@@ -118,13 +126,15 @@ instance Default ModelCfg where def = ModelCfg True "ralt" 10
 data RunCfg = RunCfg
   { _rModelCfg  :: ModelCfg  -- ^ Cfg how the model is run
   , _rInputCfg  :: InputCfg  -- ^ Cfg how to grab input
+  , _rParseCfg  :: ParseCfg  -- ^ Cfg how to parse the config file
   , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
   } deriving (Eq, Show)
 makeClassy ''RunCfg
 
-instance Default RunCfg where def = RunCfg def def def
+instance Default RunCfg where def = RunCfg def def def def
 
 instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
+instance HasParseCfg  RunCfg where parseCfg  = rParseCfg
 instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
 instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 
@@ -135,13 +145,15 @@ instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 -- 2. Maybe parse a config file (to get at KeyI)
 data DiscoverCfg = DiscoverCfg
   { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
+  , _dParseCfg    :: ParseCfg  -- ^ Config how to parse the config file
   , _dumpKeyTable :: Bool      -- ^ Flag indicating whether to dump table
   , _escapeExits  :: Bool      -- ^ Flag indicating whether to exit on escape
   } deriving (Eq, Show)
 makeClassy ''DiscoverCfg
 
-instance Default     DiscoverCfg where def      = DiscoverCfg def False True
+instance Default     DiscoverCfg where def      = DiscoverCfg def def False True
 instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
+instance HasParseCfg DiscoverCfg where parseCfg = dParseCfg
 
 {- SECTION: task --------------------------------------------------------------}
 

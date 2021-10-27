@@ -9,8 +9,9 @@ import KMonad.Util.Logging
 import KMonad.App.Invocation    (getInvocation)
 import KMonad.App.Main.Discover (runDiscover)
 import KMonad.App.Main.Run      (runRun)
+import KMonad.App.Operations
 import KMonad.App.Types
-import KMonad.App.Cfg.Types
+import KMonad.App.Configurable
 
 import System.Keyboard
 import System.Keyboard.IO
@@ -22,31 +23,34 @@ import System.Keyboard.IO
 -- 3. Dispatch on the Task
 main :: OnlyIO ()
 main = do
-  bascfg <- runChange <$> getInvocation
-
-  let logcfg = (def :: LogCfg)
-        & logLvl .~ (bascfg^.logLevel)
-        -- & logLvl .~ LevelDebug
-        & logSep .~ (if bascfg^.logSections then line else noSep)
-
-  withLogging logcfg $ \logenv -> runRIO logenv $ do
+  bascfg <- onDef <$> getInvocation
+  runBasic bascfg $ do
 
     sepDebug
     logDebug "Starting KMonad with the following configuration:"
     logDebug . ppRecord $ bascfg
 
-    withKeyTable (bascfg^.keyTableCfg) $ \keytbl -> do
+    runTask $ bascfg^.task
 
-      let basenv = BasicEnv
-                { _geBasicCfg   = bascfg
-                , _geLogEnv     = logenv
-                , _geKeyTable   = keytbl
-                }
+  -- let logcfg = (def :: LogCfg)
+  --       & logLvl .~ (bascfg^.logLevel)
+  --       -- & logLvl .~ LevelDebug
+  --       & logSep .~ (if bascfg^.logSections then line else noSep)
 
-      runRIO basenv . run $ bascfg^.task
+  -- withLogging logcfg $ \logenv -> runRIO logenv $ do
+
+
+    -- withKeyTable (bascfg^.keyTableCfg) $ \keytbl -> do
+
+    --   let basenv = BasicEnv
+    --             { _geBasicCfg   = bascfg
+    --             , _geLogEnv     = logenv
+    --             , _geKeyTable   = keytbl
+    --             }
+
 
 -- | Run the task
-run :: CanBasic m env => Task -> m ()
-run (Discover cfg) = runDiscover cfg
-run ParseTest = logError "parsetest!"
-run (Run cfg) = runRun cfg
+runTask :: CanBasic m env => Task -> m ()
+runTask (Discover cfg) = runDiscover cfg
+runTask ParseTest = logError "parsetest!"
+runTask (Run cfg) = runRun cfg

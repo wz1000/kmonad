@@ -49,112 +49,110 @@ import qualified RIO.HashMap as M
 import qualified RIO.Text as T
 import qualified Text.Megaparsec.Char.Lexer as L
 
+import Text.Megaparsec hiding (parse)
+import Text.Megaparsec.Char
 
--- --------------------------------------------------------------------------------
--- -- $run
+import System.Keyboard
 
--- -- | Try to parse a list of 'KExpr' from 'Text'
--- parseTokens :: Text -> Either PErrors [KExpr]
--- parseTokens t = case runParser configP "" t  of
---   Left  e -> Left $ PErrors e
---   Right x -> Right x
-
--- -- | Load a set of tokens from file, throw an error on parse-fail
--- loadTokens :: (MonadIO m, MonadThrow m) => FilePath -> m [KExpr]
--- loadTokens pth = parseTokens <$> readFileUtf8 pth >>= \case
---   Left e   -> throwM e
---   Right xs -> pure xs
+{- SECTION: Top-level ---------------------------------------------------------}
 
 
--- --------------------------------------------------------------------------------
--- -- $basic
+-- | Try to parse an entire configuration
+-- parseConfig :: ParseCfg -> Text -> Either PErrors [KExpr]
+-- parseConfig = flip parse configP
 
--- -- | Consume whitespace
--- sc :: Parser ()
--- sc = L.space
---   space1
---   (L.skipLineComment  ";;")
---   (L.skipBlockComment "#|" "|#")
+-- | Top level parser
+configP :: P [KExpr]
+configP = undefined
 
--- -- | Consume whitespace after the provided parser
--- lexeme :: Parser a -> Parser a
--- lexeme = L.lexeme sc
+{- SECTION: Elementary parsers ------------------------------------------------}
 
--- -- | Consume 1 symbol
--- symbol :: Text -> Parser ()
--- symbol = void . L.symbol sc
+-- | Parse any amount of whitespace
+sc :: P ()
+sc = L.space
+  space1
+  (L.skipLineComment  ";;")
+  (L.skipBlockComment "#|" "|#")
 
--- -- | List of all characters that /end/ a word or sequence
--- terminators :: String
--- terminators = ")\""
+-- | Turn a parser into one that consumes all whitespace behind it.
+lexeme :: P a -> P a
+lexeme = L.lexeme sc
 
--- terminatorP :: Parser Char
--- terminatorP = satisfy (`elem` terminators)
+-- | Match 1 literal symbol (and consume trailing whitespace)
+symbol :: Text -> P ()
+symbol = void . L.symbol sc
 
--- -- | Consume all chars until a space is encounterd
--- word :: Parser Text
--- word = T.pack <$> some (satisfy wordChar)
---   where wordChar c = not (isSpace c || c `elem` terminators)
+-- | List of all characters that /end/ a word or sequence
+terminators :: String
+terminators = ")\""
 
--- -- | Run the parser IFF it is followed by a space, eof, or reserved char
--- terminated :: Parser a -> Parser a
--- terminated p = try $ p <* lookAhead (void spaceChar <|> eof <|> void terminatorP)
+terminatorP :: P Char
+terminatorP = satisfy (`elem` terminators)
 
--- -- | Run the parser IFF it is not followed by a space or eof.
--- prefix :: Parser a -> Parser a
--- prefix p = try $ p <* notFollowedBy (void spaceChar <|> eof)
+-- | Consume all chars until a space is encounterd
+word :: P Text
+word = T.pack <$> some (satisfy wordChar)
+  where wordChar c = not (isSpace c || c `elem` terminators)
 
--- -- | Create a parser that matches symbols to values and only consumes on match.
--- fromNamed :: [(Text, a)] -> Parser a
--- fromNamed = choice . map mkOne . srt
---   where
---     -- | Sort descending by length of key and then alphabetically
---     srt :: [(Text, b)] -> [(Text, b)]
---     srt = sortBy . flip on fst $ \a b ->
---       case compare (T.length b) (T.length a) of
---         EQ -> compare a b
---         x  -> x
+-- | Run the parser IFF it is followed by a space, eof, or reserved char
+terminated :: P a -> P a
+terminated p = try $ p <* lookAhead (void spaceChar <|> eof <|> void terminatorP)
 
---     -- | Make a parser that matches a terminated symbol or fails
---     mkOne (s, x) = terminated (string s) *> pure x
+-- | Run the parser IFF it is not followed by a space or eof.
+prefix :: P a -> P a
+prefix p = try $ p <* notFollowedBy (void spaceChar <|> eof)
 
--- -- | Run a parser between 2 sets of parentheses
--- paren :: Parser a -> Parser a
--- paren = between (symbol "(") (symbol ")")
+-- | Create a parser that matches symbols to values and only consumes on match.
+fromNamed :: [(Text, a)] -> P a
+fromNamed = choice . map mkOne . srt
+  where
+    -- | Sort descending by length of key and then alphabetically
+    srt :: [(Text, b)] -> [(Text, b)]
+    srt = sortBy . flip on fst $ \a b ->
+      case compare (T.length b) (T.length a) of
+        EQ -> compare a b
+        x  -> x
 
--- -- | Run a parser between 2 sets of parentheses starting with a symbol
--- statement :: Text -> Parser a -> Parser a
--- statement s = paren . (symbol s *>)
+    -- | Make a parser that matches a terminated symbol or fails
+    mkOne (s, x) = terminated (string s) *> pure x
 
--- -- | Run a parser that parser a bool value
--- bool :: Parser Bool
--- bool = symbol "true" *> pure True
---    <|> symbol "false" *> pure False
+-- | Run a parser between 2 sets of parentheses
+paren :: P a -> P a
+paren = between (symbol "(") (symbol ")")
 
--- -- | Parse a LISP-like keyword of the form @:keyword value@
--- keywordP :: Text -> Parser p -> Parser p
--- keywordP kw p = lexeme (string (":" <> kw)) *> lexeme p
---   <?> "Keyword " <> ":" <> T.unpack kw
+-- | Run a parser between 2 sets of parentheses starting with a symbol
+statement :: Text -> P a -> P a
+statement s = paren . (symbol s *>)
 
--- --------------------------------------------------------------------------------
--- -- $elem
--- --
--- -- Parsers for elements that are not stand-alone KExpr's
+-- | Run a parser that parser a bool value
+bool :: P Bool
+bool = symbol "true" *> pure True
+   <|> symbol "false" *> pure False
 
--- -- | Parse an integer
--- numP :: Parser Int
--- numP = L.decimal
+-- | Parse a LISP-like keyword of the form @:keyword value@
+keywordP :: Text -> P p -> P p
+keywordP kw p = lexeme (string (":" <> kw)) *> lexeme p
+  <?> "Keyword " <> ":" <> T.unpack kw
 
--- -- | Parse text with escaped characters between "s
--- textP :: Parser Text
--- textP = do
---   _ <- char '\"' <|> char '\''
---   s <- manyTill L.charLiteral (char '\"' <|> char '\'')
---   pure . T.pack $ s
+--------------------------------------------------------------------------------
+-- $elem
+--
+-- Parsers for elements that are not stand-alone KExpr's
 
--- -- | Parse a variable reference
--- derefP :: Parser Text
--- derefP = prefix (char '@') *> word
+-- | Parse an integer
+numP :: P Int
+numP = L.decimal
+
+-- | Parse text with escaped characters between "s
+textP :: P Text
+textP = do
+  _ <- char '\"' <|> char '\''
+  s <- manyTill L.charLiteral (char '\"' <|> char '\'')
+  pure . T.pack $ s
+
+-- | Parse a variable reference
+derefP :: P Text
+derefP = prefix (char '@') *> word
 
 -- --------------------------------------------------------------------------------
 -- -- $cmb
@@ -162,15 +160,15 @@ import qualified Text.Megaparsec.Char.Lexer as L
 -- -- Parsers built up from the basic KExpr's
 
 -- -- | Consume an entire file of expressions and comments
--- configP :: Parser [KExpr]
+-- configP :: P [KExpr]
 -- configP = sc *> exprsP <* eof
 
 -- -- | Parse 0 or more KExpr's
--- exprsP :: Parser [KExpr]
+-- exprsP :: P [KExpr]
 -- exprsP = lexeme . many $ lexeme exprP
 
 -- -- | Parse 1 KExpr
--- exprP :: Parser KExpr
+-- exprP :: P KExpr
 -- exprP = paren . choice $
 --   [ try (symbol "defcfg")   *> (KDefCfg   <$> defcfgP)
 --   , try (symbol "defsrc")   *> (KDefSrc   <$> defsrcP)
@@ -179,7 +177,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --   ]
 
 -- -- -- | Parse a (123, 456) tuple as a KeyRepeatCfg
--- -- repCfgP :: Parser KeyRepeatCfg
+-- -- repCfgP :: P KeyRepeatCfg
 -- -- repCfgP = lexeme $ paren $ do
 -- --   a <- numP
 -- --   _ <- char ','
@@ -187,17 +185,34 @@ import qualified Text.Megaparsec.Char.Lexer as L
 -- --   pure $ KeyRepeatCfg (fi a) (fi b)
 
 -- --------------------------------------------------------------------------------
--- -- $but
--- --
--- -- All the various ways to refer to buttons
+-- $but
+--
+-- All the various ways to refer to buttons
 
--- -- | Turn 2 strings into a list of singleton-Text tuples by zipping the lists.
--- --
--- -- z "abc" "123" -> [("a", "1"), ("b", 2) ...]
--- z :: String -> String -> [(Text, Text)]
--- z a b = uncurry zip $ over (both.traversed) T.singleton (a, b)
+-- | Turn 2 strings into a list of singleton-Text tuples by zipping the lists.
+--
+-- z "abc" "123" -> [("a", "1"), ("b", 2) ...]
+z :: String -> String -> [(Text, Text)]
+z a b = uncurry zip $ over (both.traversed) T.singleton (a, b)
 
--- -- | Different ways to refer to shifted versions of keycodes
+-- | Make a button that emits a particular keycode
+emitOf :: Keyname -> P DefButton
+emitOf n = do
+  view (codeForName n) >>= \case
+    Nothing -> customFailure $ NoKeycodeFor n
+    Just c  -> pure $ KEmit c
+
+-- | A parser that parses any @shifted@ name from the keycode table
+shiftedP :: P DefButton
+shiftedP = undefined
+
+
+
+-- | Make a button that emits a particular shifted keycode
+-- shiftedOf :: CoreName -> DefButton
+-- shiftedOf = KAround (emitOf "lsft") . emitOf
+
+-- | Different ways to refer to shifted versions of keycodes
 -- shiftedNames :: [(Text, DefButton)]
 -- shiftedNames = map (second (shiftedOf . CoreName)) $ cps <> num <> oth where
 --   cps = z ['A'..'Z'] ['a'..'z']
@@ -221,7 +236,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --            , ("lprn", shiftedB "9"), ("rprn", shiftedB "0")]
 
 -- -- | Parse "X-b" style modded-sequences
--- moddedP :: Parser DefButton
+-- moddedP :: P DefButton
 -- moddedP = KAround <$> prfx <*> buttonP
 --   where mods = [ ("S-",  kc "lsft"), ("C-",  kc "lctl")
 --                , ("A-",  kc "lalt"), ("M-",  kc "lmet")
@@ -230,17 +245,17 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --         prfx = choice $ map (\(t, p) -> prefix (string t) *> pure (KEmit p)) mods
 
 -- -- | Parse Pxxx as pauses (useful in macros)
--- pauseP :: Parser DefButton
+-- pauseP :: P DefButton
 -- pauseP = KPause . fromIntegral <$> (char 'P' *> numP)
 
 -- -- | #()-syntax tap-macro
--- rmTapMacroP :: Parser DefButton
+-- rmTapMacroP :: P DefButton
 -- rmTapMacroP =
 --   char '#' *> paren (KTapMacro <$> some buttonP
 --                                <*> optional (keywordP "delay" numP))
 
 -- -- | Compose-key sequence
--- composeSeqP :: Parser [DefButton]
+-- composeSeqP :: P [DefButton]
 -- composeSeqP = do
 --   -- Lookup 1 character in the compose-seq list
 --   c <- anySingle <?> "special character"
@@ -262,7 +277,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --     Right b -> pure b
 
 -- -- | Parse a dead-key sequence as a `+` followed by some symbol
--- deadkeySeqP :: Parser [DefButton]
+-- deadkeySeqP :: P [DefButton]
 -- deadkeySeqP = do
 --   _ <- prefix (char '+')
 --   c <- satisfy (`elem` ("~'^`\"," :: String))
@@ -271,14 +286,14 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --     Right b -> pure [b]
 
 -- -- | Parse any button
--- buttonP :: Parser DefButton
+-- buttonP :: P DefButton
 -- buttonP = (lexeme . choice . map try $
 --   map (uncurry statement) keywordButtons ++ noKeywordButtons
 --   ) <?> "button"
 
 -- -- | Parsers for buttons that have a keyword at the start; the format is
 -- -- @(keyword, how to parse the token)@
--- keywordButtons :: [(Text, Parser DefButton)]
+-- keywordButtons :: [(Text, P DefButton)]
 -- keywordButtons =
 --   [ ("around"         , KAround      <$> buttonP     <*> buttonP)
 --   , ("multi-tap"      , KMultiTap    <$> timed       <*> buttonP)
@@ -306,11 +321,11 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --   , ("sticky-key"     , KStickyKey   <$> lexeme numP <*> buttonP)
 --   ]
 --  where
---   timed :: Parser [(Int, DefButton)]
+--   timed :: P [(Int, DefButton)]
 --   timed = many ((,) <$> lexeme numP <*> lexeme buttonP)
 
 -- -- | Parsers for buttons that do __not__ have a keyword at the start
--- noKeywordButtons :: [Parser DefButton]
+-- noKeywordButtons :: [P DefButton]
 -- noKeywordButtons =
 --   [ KComposeSeq <$> deadkeySeqP
 --   , KRef  <$> derefP
@@ -326,22 +341,22 @@ import qualified Text.Megaparsec.Char.Lexer as L
 -- -- $defcfg
 
 -- -- | Parse an input token
--- itokenP :: Parser InputToken
+-- itokenP :: P InputToken
 -- itokenP = choice $ map (try . uncurry statement) itokens
 
 -- -- | Input tokens to parse; the format is @(keyword, how to parse the token)@
--- itokens :: [(Text, Parser InputToken)]
+-- itokens :: [(Text, P InputToken)]
 -- itokens =
 --   [ ("device-file"   , Evdev . fmap unpack <$> optional textP)
 --   , ("low-level-hook", pure LLHook)
 --   , ("iokit-name"    , IOKit <$> optional textP)]
 
 -- -- | Parse an output token
--- otokenP :: Parser OutputToken
+-- otokenP :: P OutputToken
 -- otokenP = choice $ map (try . uncurry statement) otokens
 
 -- -- | Output tokens to parse; the format is @(keyword, how to parse the token)@
--- otokens :: [(Text, Parser OutputToken)]
+-- otokens :: [(Text, P OutputToken)]
 -- otokens =
 --   [ ("uinput-sink"    , Uinput <$> lexeme (optional textP) <*> lexeme (optional textP))
 --   , ("send-event-sink", pure SendKeys)
@@ -349,11 +364,11 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --   , ("kext"           , pure Ext)]
 
 -- -- | Parse the DefCfg token
--- defcfgP :: Parser DefSettings
+-- defcfgP :: P DefSettings
 -- defcfgP = some (lexeme settingP)
 
 -- -- | All the settable settings in a `defcfg` block
--- settings :: [(Text, Parser DefSetting)]
+-- settings :: [(Text, P DefSetting)]
 -- settings =
 --     [ ("input"         , SIToken      <$> itokenP)
 --     , ("output"        , SOToken      <$> otokenP)
@@ -365,7 +380,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --     ]
 
 -- -- | All possible configuration options that can be passed in the defcfg block
--- settingP :: Parser DefSetting
+-- settingP :: P DefSetting
 -- settingP = lexeme . choice . map (\(s, p) -> (try $ symbol s) *> p) $ settings
 
 
@@ -373,16 +388,16 @@ import qualified Text.Megaparsec.Char.Lexer as L
 -- -- $defalias
 
 -- -- | Parse a collection of names and buttons
--- defaliasP :: Parser DefAlias
+-- defaliasP :: P DefAlias
 -- defaliasP = many $ (,) <$> lexeme word <*> buttonP
 
 -- --------------------------------------------------------------------------------
 -- -- $defsrc
 
--- defsrcP :: Parser DefSrc
+-- defsrcP :: P DefSrc
 -- defsrcP = many $ lexeme keycodeP
 
 -- --------------------------------------------------------------------------------
 -- -- $deflayer
--- deflayerP :: Parser DefLayer
+-- deflayerP :: P DefLayer
 -- deflayerP = DefLayer <$> lexeme word <*> many (lexeme buttonP)

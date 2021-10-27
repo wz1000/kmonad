@@ -112,6 +112,7 @@ runP = setTask "task:run" Run runCfgP
   where runCfgP = pRun . pConcat $
           [ modelCfgP
           , inputCfgP
+          , parseCfgP
           , outputCfgP
           ]
 
@@ -129,6 +130,7 @@ discoverP :: P BasicCfg
 discoverP = setTask "task:discover" Discover discoverCfgP
   where discoverCfgP = pRun . pConcat $
           [ inputCfgP
+          , parseCfgP
           , fromFlag flagDumpKeyTable mempty
           , fromFlag flagInescapable  mempty
           ]
@@ -155,12 +157,15 @@ basicCfgP = pConcat
         [ ("debug", LevelDebug), ("warn", LevelWarn)
         , ("info",  LevelInfo),  ("error", LevelError) ]
 
+-- | All settings that apply to parsing the config file
+parseCfgP :: HasParseCfg c => P c
+parseCfgP = fromOption optComposeKey txt (metavar "KEYNAME")
+
 -- | All settings that apply to running a keyboard remapping
 modelCfgP :: HasModelCfg c => P c
 modelCfgP = pConcat
   [ -- Options
-    fromOption optComposeKey txt (metavar "KEYNAME")
-  , fromOption optMacroDelay ms_ mempty
+    fromOption optMacroDelay ms_ mempty
     -- Flags
   , fromFlag flagFallthroughOff mempty
   , fromFlag flagFallthroughOn  mempty

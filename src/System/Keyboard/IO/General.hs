@@ -25,7 +25,7 @@ getKey = view (keyI . uKeyI) >>= liftIO
 {- NOTE: KeyTable contexts ----------------------------------------------------}
 
 withKeyTable :: MonadUnliftIO m => KeyTableCfg -> (KeyTable -> m a) -> m a
-withKeyTable EnUS              f = f enUSTable
+withKeyTable EnUS              f = f tableEnUS
 withKeyTable (CustomTable pth) f = f =<< readKeyTable <$> readFileUtf8 pth
 
 
@@ -36,5 +36,6 @@ withInput c f = do
   threadDelay $ 1000 * c^.startDelay
   case c^.inputToken of
     (Evdev c) -> withEvdev c $ \(BasicKeyI i) -> f (KeyI i)
+
 
 instance CanOpenKeyI InputCfg where withKeyI i = withInput i

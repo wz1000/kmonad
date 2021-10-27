@@ -23,6 +23,8 @@ import Foreign.Storable
 
 import GHC.Enum (Enum(..))
 
+import qualified RIO.HashMap as M
+
 {- NOTE: Basic -}
 
 -- Text disambiguations
@@ -419,12 +421,12 @@ instance Exception OSException where
     [ "Tried to '", action, "' on <", tshow currentOS
     , ">. But this is only supported on <", tshow target, ">" ]
 
-{- NOTE: Names -----------------------------------------------------------------
--------------------------------------------------------------------------------}
+{- SECTION: naming keys across OSes -------------------------------------------}
 
 -- | A record describing a correspondence between a semantic key and OS codes
 data KeyCongruence = KeyCongruence
   { _keyName        :: Keyname
+  , _shiftedName    :: Maybe Keyname
   , _keyDescription :: Text
   , _keyLin         :: Maybe LinKeycode
   , _keyMac         :: Maybe MacKeycode
@@ -435,15 +437,17 @@ makeLenses ''KeyCongruence
 instance Display KeyCongruence where
   textDisplay k = mconcat
     [ k^.keyName, " "
-    , maybe "~" tshow (k^?keyLin._Just._Keycode), " "
-    , maybe "~" tshow (k^?keyMac._Just._Keycode), " "
-    , maybe "~" tshow (k^?keyWin._Just._Keycode), " "
+    , maybe "~~" tshow (k^.shiftedName)          , " "
+    , maybe "~~" tshow (k^?keyLin._Just._Keycode), " "
+    , maybe "~~" tshow (k^?keyMac._Just._Keycode), " "
+    , maybe "~~" tshow (k^?keyWin._Just._Keycode), " "
     , "(", k^.keyDescription, ")"
     ]
 
 -- | A table of keyname to keycode mappings across OSes
 newtype KeyTable = KeyTable { _uKeyTable :: [KeyCongruence] }
   deriving (Show, Eq)
+makeLenses ''KeyTable
 
 -- | Value indicating which key-locale to use.
 data KeyTableCfg
@@ -455,6 +459,12 @@ data KeyTableCfg
 class HasKeyTable a where keyTable :: Getter a KeyTable
 
 instance HasKeyTable KeyTable where keyTable = id
+
+type CanKeyTable m env = (MonadReader env m, HasKeyTable env)
+
+-- | A simple Keyname to Keycode mapping
+type KeyDict = M.HashMap Keyname Keycode
+
 
 {- NOTE: Key-repeat types ------------------------------------------------------
 -------------------------------------------------------------------------------}

@@ -8,7 +8,7 @@ import KMonad.Prelude
 import KMonad.App.Invocation.Parser
 import KMonad.App.Invocation.TH
 import KMonad.App.Types
-import KMonad.App.Cfg.Types
+import KMonad.App.Configurable
 import Options.Applicative
 import Text.RawString.QQ
 

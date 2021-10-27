@@ -4,16 +4,43 @@ where
 
 import KMonad.Prelude hiding (try)
 
+import KMonad.App.Types
+import KMonad.App.Operations
 import KMonad.App.Parser.Types
-import KMonad.Util.Name
-import KMonad.Util.Keyboard
 
-import RIO.List (sortBy)
-import qualified RIO.HashMap as M
-import qualified RIO.Text as T
+import System.Keyboard
 
-import Text.Megaparsec (choice, try)
-import Text.Megaparsec.Char (string)
+import Text.Megaparsec
+
+-- | Run a parser on some text and return the result
+--
+-- Note that this will throw any parse-error it encounters
+runParse :: CanBasic m env => ParseCfg -> P a -> Text -> m a
+runParse c p t = do
+  tbl     <- view keyTable
+  cmpcode <- view (codeForName $ c^.composeKey) >>= \case
+                Nothing -> throwIO $ UnknownComposeKey (c^.composeKey)
+                Just c  -> pure c
+
+  let env = ParseEnv
+        { _pKeyTable   = tbl
+        , _composeCode = cmpcode
+        }
+
+  case runReader (runParserT p "" t) env of
+    Left e  -> throwIO $ PErrors e
+    Right a -> pure a
+
+-- | Shorthand for debugging, maybe delete later
+--
+-- Very handy in the REPL, e.g.
+-- >> prs bool "true"
+-- True
+prs :: P a -> Text -> OnlyIO a
+prs p = runBasic def . runParse def p
+
+
+-- withParse :: CanBasic m env => ParseCfg -> ()
 
 -- -- | Like 'fromLexicon' but case-insensitive
 -- fromLexicon' :: Lexicon a -> Parser a
@@ -27,13 +54,7 @@ import Text.Megaparsec.Char (string)
 --   f  (k, _) (l, _) = compare l k    -- ^ Reverse sort by name
 --   go (k, v) = v <$ (try $ string k) -- ^ Match the name and insert the value
 
--- -- | Make a button that emits a particular keycode
--- emitOf :: CoreName -> DefButton
--- emitOf = KEmit . kc
 
--- -- | Make a button that emits a particular shifted keycode
--- shiftedOf :: CoreName -> DefButton
--- shiftedOf = KAround (emitOf "lsft") . emitOf
 
 -- -- thing :: [(Text, Text)]
 -- -- thing = zip $

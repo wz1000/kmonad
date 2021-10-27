@@ -22,14 +22,15 @@ greeting = [r| Welcome to KMonad's key-discovery report.
 
 Please push any key, and we will report what we know about it. The output format
 of the line(s) describing keycode names is:
-name linux mac windows (description of the key)
+name shifted linux mac windows (description of the key)
 
 where:
 - name: portable name that will be recognized in the config-file
+- shifted: name used to refer to emitted a shifted version of this key
 - linux, mac, windows: evaluate as keycode literals, but are not portable
 - description: clarification of what the key is.
 
-A keycode literal of '~' means we have no code for the name on that OS
+A value of '~~' means we have no code or name for that entry
 
 Please note the following:
 - If a key is not triggering a discovery report, then the event is not reaching
@@ -83,11 +84,11 @@ instance Exception DiscoverException where
 {- SECTION: io -------------------------------------------------------------------}
 
 runDiscover :: CanBasic m env => DiscoverCfg -> m ()
-runDiscover cfg = if cfg^.dumpKeyTable then logError enUSTableText else do
+runDiscover cfg = if cfg^.dumpKeyTable then logError tableEnUSText else do
 
   logenv <- view logEnv
   keytbl <- view keyTable
-  esc    <- getCode "esc"
+  esc    <- view $ codeForName "esc"
 
   -- Set up a function to check if a keycode is equal to escape
   isDone <- case (cfg^.escapeExits, esc) of
@@ -116,7 +117,7 @@ discoverReport s = do
   logError $ "Type:    " <> tshow (s^.switch)
   logError $ "Keycode: " <> tshow (s^.keycode)
 
-  getNames (s^.keycode) >>= \case
+  view (namesForCode s) >>= \case
     []  -> logError "We have no names on file for this key."
     [k] -> dspError k
     ks  -> do logError "We have multiple names on file for this key: "

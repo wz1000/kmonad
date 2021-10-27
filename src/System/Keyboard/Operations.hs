@@ -18,6 +18,13 @@ pressOf   = mkKeySwitch Press
 releaseOf = mkKeySwitch Release
 -- NOTE: These should probably live somewhere else as they are smart construtcors
 
+{- SECTION: OS ----------------------------------------------------------------}
+
+-- | Easy way to check if we are on a certain OS
+onWindows, onMac, onLinux :: Bool
+onWindows = currentOS == Windows
+onMac     = currentOS == Mac
+onLinux   = currentOS == Linux
 
 {- SECTION: Keycodes ----------------------------------------------------------}
 
@@ -91,6 +98,29 @@ keyDictForOS os = to $ \a -> (foldr go mempty $ a^.ks)
 keyDict :: HasKeyTable a => Getter a KeyDict
 keyDict = keyDictForOS currentOS
 
+-- | Lookup the shifted names for a keycode
+--
+-- These are the names used to refer to what happens when this button is tapped
+-- while shift is held. This muddles the semantics a *little* bit, but this
+-- table is also the best place to specify locales, and this is therefore a
+-- practical place to keep it all together.
+shiftedDictForOS :: HasKeyTable a => OS -> Getter a KeyDict
+shiftedDictForOS os = to $ \a -> (foldr go mempty $ a^.ks)
+  where
+    go k acc = acc <> case (os, k^.shiftedName) of
+      (_, Nothing) -> mempty
+      (Linux, Just n) ->
+        maybe mempty (\c -> M.singleton n (c^._Keycode)) (k^.keyLin)
+      (Mac, Just n) ->
+        maybe mempty (\c -> M.singleton n (c^._Keycode)) (k^.keyMac)
+      (Windows, Just n) ->
+        maybe mempty (\c -> M.singleton n (c^._Keycode)) (k^.keyWin)
+
+-- | Like 'shiftedDictForOS' but for the 'currentOS'
+shiftedDict :: HasKeyTable a => Getter a KeyDict
+shiftedDict = shiftedDictForOS currentOS
+
+
 {- NOTE: I'm not sure if coding keycode lookup like this caches the dict in a
  thunk or not. If it doesn't then this is 'slow', because we are constructing an
  entire dict every time we lookup a keycode. On the other hand, we only do this
@@ -102,6 +132,14 @@ keyDict = keyDictForOS currentOS
 codeForNameForOS :: HasKeyTable a => OS -> Keyname -> Getter a (Maybe Keycode)
 codeForNameForOS os n = keyDictForOS os . at n
 
--- | Lookup the Keycode for a Keyname for a given OS
+-- | Lookup the Keycode for a Keyname for the current OS
 codeForName :: HasKeyTable a => Keyname -> Getter a (Maybe Keycode)
 codeForName n = keyDict . at n
+
+-- | Lookup the Keycode for a shifted name for a given OS
+codeForShiftedForOS :: HasKeyTable a => OS -> Keyname -> Getter a (Maybe Keycode)
+codeForShiftedForOS os n = shiftedDictForOS os . at n
+
+-- | Lookup the Keycode for a shifted name for the current OS
+codeForShifted :: HasKeyTable a => Keyname -> Getter a (Maybe Keycode)
+codeForShifted n = shiftedDict . at n

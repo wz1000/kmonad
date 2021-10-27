@@ -67,6 +67,7 @@ import Text.Megaparsec.Char
 data ParseEnv = ParseEnv
   { _pKeyTable   :: KeyTable
   , _composeCode :: Keycode
+  , _shiftCode   :: Keycode
   } deriving (Eq, Show)
 makeClassy ''ParseEnv
 
@@ -76,12 +77,15 @@ instance HasKeyTable ParseEnv where keyTable = pKeyTable
 
 data MyError
   = UnknownComposeKey Keyname -- ^ Failed to look up the compose key
+  | UnknownShiftKey   Keyname -- ^ Failed to look up the standard shift key
   | NoKeycodeFor Keyname      -- ^ Failed to lookup keycode
   deriving (Eq, Ord, Show)
 
+-- FIXME: Might want some better string representations here
 instance Exception MyError where
   displayException (NoKeycodeFor n) = "Porque? " <> unpack n
   displayException (UnknownComposeKey n) = "Pourquoi? " <> unpack n
+  displayException (UnknownShiftKey n) = "Waarom? " <> unpack n
 
 instance ShowErrorComponent MyError where
   showErrorComponent = displayException
@@ -106,13 +110,17 @@ instance Exception PErrors
 --
 -- Tokens representing different types of buttons
 
--- FIXME: This is really broken: why are there 2 lists of 'DefButton's? There is
--- one here, and one in Parser/Types.hs
+
+-- NOTE: Not sure if this should live here.. App.Types is better I think
+data ModKey
+  = Ctrl  | Shift  | Alt  | Meta | RCtrl | RShift | RAlt | RMeta
+  deriving (Eq, Show)
 
 -- | Button ADT
 data DefButton
   = KRef Text                              -- ^ Reference a named button
-  | KEmit Keycode                          -- ^ Emit a keycode
+  | KSimple Keyname                        -- ^ Emit a keycode by its name, either normal or shifted
+  | KModded ModKey DefButton               -- ^ Modded version of some button
   | KLayerToggle Text                      -- ^ Toggle to a layer when held
   | KLayerSwitch Text                      -- ^ Switch base-layer when pressed
   | KLayerAdd Text                         -- ^ Add a layer when pressed

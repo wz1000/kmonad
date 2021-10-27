@@ -107,12 +107,16 @@ instance Default ModelCfg where def = ModelCfg True 10
 
 {- SUBSECTION: parse ----------------------------------------------------------}
 
+{- NOTE: All these settings are about how to generate sequences.. not really about
+ parsing.. This should live somewhere else. This is model cfg, not parse-cfg -}
+
 data ParseCfg = ParseCfg
-  { _composeKey  :: Keyname -- ^ What button to use as a compose-key
+  { _composeKey :: Keyname -- ^ keyname of keycode to use as a compose-key
   } deriving (Eq, Show)
 makeClassy ''ParseCfg
 
-instance Default     ParseCfg where def = ParseCfg "ralt"
+instance Default ParseCfg where
+  def = ParseCfg "cmp"
 
 {- SECTION: task configs ------------------------------------------------------}
 

@@ -19,12 +19,17 @@ runParse :: CanBasic m env => ParseCfg -> P a -> Text -> m a
 runParse c p t = do
   tbl     <- view keyTable
   cmpcode <- view (codeForName $ c^.composeKey) >>= \case
-                Nothing -> throwIO $ UnknownComposeKey (c^.composeKey)
-                Just c  -> pure c
+    Nothing -> throwIO $ UnknownComposeKey (c^.composeKey)
+    Just c  -> pure c
+  sftcode <- view (codeForName $ "stdsft") >>= \case
+    Nothing -> throwIO $ UnknownShiftKey "stdsft"
+    Just c  -> pure c
+
 
   let env = ParseEnv
         { _pKeyTable   = tbl
         , _composeCode = cmpcode
+        , _shiftCode   = sftcode
         }
 
   case runReader (runParserT p "" t) env of

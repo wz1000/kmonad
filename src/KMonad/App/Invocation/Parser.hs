@@ -159,7 +159,9 @@ basicCfgP = pConcat
 
 -- | All settings that apply to parsing the config file
 parseCfgP :: HasParseCfg c => P c
-parseCfgP = fromOption optComposeKey txt (metavar "KEYNAME")
+parseCfgP = pConcat
+  [ fromOption optComposeKey txt (metavar "KEYNAME")
+  ]
 
 -- | All settings that apply to running a keyboard remapping
 modelCfgP :: HasModelCfg c => P c

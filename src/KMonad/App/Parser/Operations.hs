@@ -14,38 +14,38 @@ import Text.Megaparsec
 
 -- | Run a parser on some text and return the result
 --
--- Note that this will throw any parse-error it encounters
-runParse :: CanBasic m env => ParseCfg -> P a -> Text -> m a
-runParse c p t = do
-  tbl     <- view keyTable
-  cmpcode <- view (codeForName $ c^.composeKey) >>= \case
-    Nothing -> throwIO $ UnknownComposeKey (c^.composeKey)
-    Just c  -> pure c
-  sftcode <- view (codeForName $ "stdsft") >>= \case
-    Nothing -> throwIO $ UnknownShiftKey "stdsft"
-    Just c  -> pure c
+-- -- Note that this will throw any parse-error it encounters
+-- runParse :: CanBasic m env => ParseCfg -> P a -> Text -> m a
+-- runParse c p t = do
+--   tbl     <- view keyTable
+--   cmpcode <- view (codeForName $ c^.composeKey) >>= \case
+--     Nothing -> throwIO $ UnknownComposeKey (c^.composeKey)
+--     Just c  -> pure c
+--   sftcode <- view (codeForName $ "stdsft") >>= \case
+--     Nothing -> throwIO $ UnknownShiftKey "stdsft"
+--     Just c  -> pure c
 
 
-  let env = ParseEnv
-        { _pKeyTable   = tbl
-        , _composeCode = cmpcode
-        , _shiftCode   = sftcode
-        }
+--   let env = ParseEnv
+--         { _pKeyTable   = tbl
+--         , _composeCode = cmpcode
+--         , _shiftCode   = sftcode
+--         }
 
-  case runReader (runParserT p "" t) env of
-    Left e  -> throwIO $ PErrors e
-    Right a -> pure a
+--   case runReader (runParserT p "" t) env of
+--     Left e  -> throwIO $ PErrors e
+--     Right a -> pure a
 
--- | Shorthand for debugging, maybe delete later
---
--- Very handy in the REPL, e.g.
--- >> prs bool "true"
--- True
-prs :: P a -> Text -> OnlyIO a
-prs p = runBasic def . runParse def p
+-- -- | Shorthand for debugging, maybe delete later
+-- --
+-- -- Very handy in the REPL, e.g.
+-- -- >> prs bool "true"
+-- -- True
+-- prs :: P a -> Text -> OnlyIO a
+-- prs p = runBasic def . runParse def p
 
 
--- withParse :: CanBasic m env => ParseCfg -> ()
+-- -- withParse :: CanBasic m env => ParseCfg -> ()
 
 -- -- | Like 'fromLexicon' but case-insensitive
 -- fromLexicon' :: Lexicon a -> Parser a

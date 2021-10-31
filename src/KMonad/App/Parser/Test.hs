@@ -6,6 +6,7 @@ import KMonad.Prelude
 import Text.RawString.QQ
 import qualified RIO.Text as T
 
+cfg :: Text
 cfg = T.drop 1 $ [r|
 ;; Basic system config
 (defcfg
@@ -19,6 +20,7 @@ cfg = T.drop 1 $ [r|
 )
 |]
 
+src :: Text
 src = T.drop 1 $ [r|
 ;; Source-layer. Lines up with the static layer defined in my QMK driver.
 (defsrc
@@ -29,6 +31,7 @@ src = T.drop 1 $ [r|
 )
 |]
 
+als :: Text
 als = T.drop 1 $ [r|
 (defalias
 
@@ -105,6 +108,7 @@ als = T.drop 1 $ [r|
 )
 |]
 
+myCfg :: Text
 myCfg = T.drop 1 $ [r|
 #| --------------------------------------------------------------------------
 
@@ -137,11 +141,15 @@ myCfg = T.drop 1 $ [r|
 (defcfg
   ;; Linux only
   evdev-device-file   /dev/input/by-id/usb-Technomancy_Atreus_0-event-kbd
-  output-name         "KMonad: Atreus"
+  uinput-device-name  "KMonad: Atreus"
 
   ;; General
   start-delay         500
-  post-init           "/run/current-system/sw/bin/setxkbmap -option compose:ralt -option caps:none"
+  ;; post-init-cmd       "/run/current-system/sw/bin/setxkbmap -option compose:ralt -option caps:none"
+
+  sections-off
+  verbose
+
   )
 
 ;; Source-layer. Lines up with the static layer defined in my QMK driver.

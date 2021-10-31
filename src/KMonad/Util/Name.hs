@@ -21,6 +21,13 @@ type Name = Text
 class HasName a where name :: Lens' a Name
 instance HasName Name where name = id
 
+instance HasName (Name, a) where name = _1
+
+type Named a = M.HashMap Name a
+
+byName :: (Foldable f, HasName a) => f a -> Named a
+byName = M.fromList . map (view name &&& id) . toList
+
 --------------------------------------------------------------------------------
 -- $lexicon
 --

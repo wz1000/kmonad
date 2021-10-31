@@ -7,184 +7,99 @@ import KMonad.Prelude
 import KMonad.App.Configurable
 import KMonad.App.Types
 import KMonad.Util.Name
-import KMonad.Util.Time
-import System.Keyboard hiding (switch, Description)
 
 import Options.Applicative
 
+import qualified RIO.HashMap as M
+import qualified RIO.Text    as T
 
-{- SECTION: setup -------------------------------------------------------------}
+{- SECTION: Types and utilities -----------------------------------------------}
 
-{- SUBSECTION: the P type -----------------------------------------------------}
+type P = Parser ReCfg
 
--- | The type of a parser that produces a Change on some type
-type P c = Parser (Change c)
+-- | Extra mods to apply to specific flags
+fMods :: Named (Mod FlagFields ReCfg)
+fMods = M.fromList
+  [ ( "verbose"      , short 'v' )
+  , ( "commands-off" , short 's' )
+  ]
 
--- | Run a 'P' by applying all changes to some default value
-pRun :: Default a => P a -> Parser a
-pRun = fmap onDef
+-- | Extra mods to apply to specific options
+oMods :: Named (Mod OptionFields ReCfg)
+oMods = M.fromList
+  [ ( "config-file" , short 'f' <> metavar "FILE" )
+  , ( "key-table"   , short 'k' <> metavar "FILE")
+  , ( "log-level"   , short 'l' )
+  , ( "start-delay" , short 'd' )
+  , ( "compose-key" , metavar "KEYNAME" )
+  ]
 
--- | Turn a bunch of P's into a single P by applying each edit in order.
-pConcat :: [P a] -> P a
-pConcat ps = mconcat <$> sequenceA ps
-
-{- SUBSECTION: Setting transformers -------------------------------------------}
-
--- | Automatically create a command-line option from a 'mkOption' value
---
--- Note that in regards to the 'Mod' fields we already:
--- * set the value to Nothing (important for our mechanism)
--- * set the long name to the Option's name
--- * set the help to the Options's description
---
--- Other mods can still be passed, namely 'short' and 'metavar'
-fromOption :: Option c a -> ReadM a -> Mod OptionFields (Maybe a) -> P c
-fromOption o r m = maybe mempty (runOption o) <$> p
-  where p = option (Just <$> r)
-          (  m
-          <> value Nothing
-          <> long (unpack $ o^.name)
-          <> help (unpack $ o^.description))
-
--- | Automatically create a command-line flag from a 'mkFlag' value
---
--- Note that in regards to the 'Mod' fields we already:
--- * set the long name to the Flag's name
--- * set the help to the Flag's description
-fromFlag :: Flag c -> Mod FlagFields (Change c) -> P c
-fromFlag f m = flag mempty (runFlag f)
-  (  m
+-- | Automatically create a command-line flag from an 'AnyFlag' value
+fromFlag :: AnyFlag -> P
+fromFlag f = flag mempty (runAnyFlag f)
+  (  fMods ^. ix (f^.name) -- NOTE: we rely on Mod's monoid when value not found
   <> long (unpack $ f^.name)
   <> help (unpack $ f^.description))
 
-{- SUBSECTION: input parsers ---------------------------------------------------
-In addition to the builtin `str` we specify a few more shorthands to specify how
-to read an argument.
--------------------------------------------------------------------------------}
+-- | Automatically create a command-line option from an 'Option' value
+fromOption :: AnyOption -> P
+fromOption o = option (eitherReader $ left show . runAnyOption o . pack)
+  (  oMods ^. ix (o^.name) -- NOTE: we rely on Mod's monoid when value not found
+  <> value mempty
+  <> long (unpack $ o^.name)
+  <> help (unpack $ o^.description))
 
--- | Read a millisecond value
-ms_ :: ReadM Ms
-ms_ = fi <$> int
-{- NOTE: `_` disambiguates from 'ms', which is an Iso between Int and Ms -}
-
--- | Read an int
-int :: ReadM Int
-int = auto
-
--- | Read a txt value
-txt :: ReadM Text
-txt = pack <$> str
-
--- | Wrap a reader in a Just
-j :: ReadM a -> ReadM (Maybe a)
-j = fmap Just
+-- | Turn a bunch of P's into a single P by applying each edit in order.
+--
+-- Note that rightmost is foremost, i.e. entries more to the front of the list
+-- can overwrite changes made by entries behind them, but not vice-versa. This
+-- is defined by the Monoid of Endo.
+pConcat :: [P] -> P
+pConcat ps = mconcat <$> sequenceA ps
 
 {- SECTION: Parsers -----------------------------------------------------------}
 
 {- SUBSECTION: Top-level and task parsers -------------------------------------}
 
 -- | Parse the top-level change to the default BasicCfg passed on the cmd-line
-invocationP :: P BasicCfg
+invocationP :: P
 invocationP = pConcat [ basicCfgP, taskP ]
 
--- | Parse the task
---
--- Note that, in addition to a tasks config-parser, we also run 'basicCfgP'
--- again, this is to ensure that basic configurations can be passed both before
--- and after the subcommand.
-taskP :: P BasicCfg
-taskP = let f n p d = (command n (info (pConcat [p, basicCfgP]) (progDesc d))) in
-  hsubparser $ mconcat
-    [ f "run"        runP       "Run a keyboard remapping."
-    , f "parse-test" parseTestP "Check a config-file for errors"
-    , f "discover"   discoverP  "Interactively explore button keycodes and names"
-    ]
-
--- | Helper function to generate task-insertion changes
-setTask :: Description -> (a -> Task) -> (Parser a) -> P BasicCfg
-setTask d f p = (\t -> mkChange d (\c -> c & task .~ t)) <$> (f <$> p)
-
--- | Parse the @run@ command ad ints configuration
---
--- This pulls in all configurable settings for: model, input, and output
-runP :: P BasicCfg
-runP = setTask "task:run" Run runCfgP
-  where runCfgP = pRun . pConcat $
-          [ modelCfgP
-          , inputCfgP
-          , parseCfgP
-          , outputCfgP
-          ]
-
--- | Parse the @parse-test@ command and its configuration
---
--- This pull in no extra configuration
-parseTestP :: P BasicCfg
-parseTestP = setTask "task:parse-test" (const ParseTest) (pure ())
-
--- | Parse the @discover@ command and its configuration
---
--- This pulls in configurable settings for input, and some discover-specific
--- config.
-discoverP :: P BasicCfg
-discoverP = setTask "task:discover" Discover discoverCfgP
-  where discoverCfgP = pRun . pConcat $
-          [ inputCfgP
-          , parseCfgP
-          , fromFlag flagDumpKeyTable mempty
-          , fromFlag flagInescapable  mempty
-          ]
-
-{- SUBSECTION: Parsers by category --------------------------------------------}
-
--- | All settings that apply, regardless of task
-basicCfgP :: P BasicCfg
-basicCfgP = pConcat
-  [ -- Options
-    fromOption optCfgFile  (j str) (short 'f' <> metavar "FILE")
-  , fromOption optLogLevel logLvl  (short 'l')
-  , fromOption optKeyTable tblStr  (short 'k')
-    -- Flags
-  , fromFlag flagVerbose     (short 'v')
-  , fromFlag flagSectionsOff mempty
-  , fromFlag flagSectionsOn  mempty
-  , fromFlag flagCommandsOn  mempty
-  , fromFlag flagCommandsOff (short 's')
+-- | Parse the task as a subcommand
+taskP :: P
+taskP = hsubparser $ mconcat
+  [ mkOne "run" "Run a keyboard remapping."
+      (Run def) [modelCfgP, inputCfgP, outputCfgP]
+  , mkOne "discover" "Interactively explore button keycodes and names."
+      (Discover def) [inputCfgP, discoverCfgP]
+  , mkOne "parse-test" "Check a config-file for errors."
+      ParseTest []
   ]
   where
-    tblStr = CustomTable <$> str
-    logLvl = maybeReader $ flip lookup
-        [ ("debug", LevelDebug), ("warn", LevelWarn)
-        , ("info",  LevelInfo),  ("error", LevelError) ]
+    mkOne :: Name -> Description -> Task -> [P] -> (Mod CommandFields ReCfg)
+    mkOne n d t ps =
+      let p_  = pConcat $ ps <> [basicCfgP] <> [pure tsk]
+          -- ^ Concat all parsers into 1, *order is important*
+          tsk = mkChange ("task:" <> n) (\c -> c & task .~ t)
+          -- ^ Create a task for the provided settings
+      in (command (unpack n) (info p_ (progDesc (unpack d))))
 
--- | All settings that apply to parsing the config file
-parseCfgP :: HasParseCfg c => P c
-parseCfgP = pConcat
-  [ fromOption optComposeKey txt (metavar "KEYNAME")
-  ]
+-- {- SUBSECTION: Parsers by category --------------------------------------------}
 
--- | All settings that apply to running a keyboard remapping
-modelCfgP :: HasModelCfg c => P c
-modelCfgP = pConcat
-  [ -- Options
-    fromOption optMacroDelay ms_ mempty
-    -- Flags
-  , fromFlag flagFallthroughOff mempty
-  , fromFlag flagFallthroughOn  mempty
-  ]
+-- | Helper function to compile flags and options into parser
+mkCfg :: Named AnyFlag -> Named AnyOption -> P
+mkCfg fs os = pConcat $ (map fromFlag   . M.elems $ fs)
+                     <> (map fromOption . M.elems $ os)
 
--- | All settings that apply to capturing keyboard input
-inputCfgP :: HasInputCfg c => P c
-inputCfgP = pConcat
-  [ fromOption optEvdevDeviceFile (j str) mempty
-  , fromOption optIOKitDeviceName (j txt) mempty
-  , fromOption optStartDelay      ms_     (short 'd')
-  ]
-
--- | All settings that apply to generating keyboard output
-outputCfgP :: HasOutputCfg c => P c
-outputCfgP = pConcat
-  [ fromOption optUinputDeviceName (j txt) mempty
-  , fromOption optRepeatRate       ms_     mempty
-  , fromOption optRepeatDelay      ms_     mempty
-  ]
+-- | Different parsers per category
+--
+-- Note, I could move modelCfgP and outputCfgP to a new runCfgP because they are
+-- currently only used by the 'Run' task, but I anticipate a few more tasks that
+-- might/will need access to these settings. So the seperation has been made for
+-- clarify of context and in preparation for these developments.
+basicCfgP, modelCfgP, inputCfgP, outputCfgP, discoverCfgP :: P
+basicCfgP    = mkCfg basicFlags    basicOptions
+modelCfgP    = mkCfg modelFlags    modelOptions
+inputCfgP    = mkCfg inputFlags    inputOptions
+outputCfgP   = mkCfg outputFlags   outputOptions
+discoverCfgP = mkCfg discoverFlags discoverOptions

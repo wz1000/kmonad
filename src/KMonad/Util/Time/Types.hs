@@ -45,6 +45,6 @@ _ns = lens systemNanoseconds (\t ns -> t { systemNanoseconds = ns })
 -- $delay
 
 -- | A vector forward in time, in ms.
-newtype Ms = Ms { _ms :: Int}
+newtype Ms = Ms { _Ms :: Int}
   deriving (Eq, Show, Num, Enum, Ord, Real, Integral, Display)
 makeLenses ''Ms

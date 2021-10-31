@@ -109,32 +109,6 @@ terminated p = try $ p <* lookAhead (void spaceChar <|> eof <|> void terminatorP
 prefix :: P a -> P a
 prefix p = try $ p <* notFollowedBy (void spaceChar <|> eof)
 
--- | Sort a list of something that projects into text by ordering it by:
--- * Longest first
--- * On equal length, alphabetically
---
--- This ensures that if want to try a bunch of named parsers, that you won't
--- accidentally match a substring first. E.g.
--- myParser:
---   "app"   -> 1
---   "apple" -> 2
--- >> run myParser "apple"
--- 1
---
--- If the longest strings are always at the top, this problem is automatically
--- avoided.
-descendOn :: (a -> Text) -> [a] -> [a]
-descendOn f =
-  sortBy . (`on` f) $ \a b ->
-    case (compare `on` T.length) b a of
-      EQ -> compare a b
-      x  -> x
-
--- | Create a parser that matches a single string literal from some collection.
---
--- Longer strings have precedence over shorter ones.
-matchOne :: Foldable t => t Text -> P Text
-matchOne = choice . map try . descendOn id . toList
 
 -- | Create a parser that matches symbols to values and only consumes on match.
 fromNamed :: [(Text, a)] -> P a

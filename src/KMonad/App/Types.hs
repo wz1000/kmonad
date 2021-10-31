@@ -98,25 +98,14 @@ NOTE: we import input and output configuration types from System.Keyboard.
 
 -- | Config options pertinent to running a KMonad model
 data ModelCfg = ModelCfg
-  { _fallthrough :: Bool    -- ^ Whether to rethrow uncaught key events
-  , _macroDelay  :: Ms      -- ^ How long to pause between macro-taps
+  { _fallthrough :: Bool   -- ^ Whether to rethrow uncaught key events
+  , _macroDelay  :: Ms     -- ^ How long to pause between macro-taps
+  , _composeKey  :: Keyname -- ^ keyname of keycode to use as a compose-key
   } deriving (Eq, Show)
 makeClassy ''ModelCfg
 
-instance Default ModelCfg where def = ModelCfg True 10
+instance Default ModelCfg where def = ModelCfg True 10 "cmp"
 
-{- SUBSECTION: parse ----------------------------------------------------------}
-
-{- NOTE: All these settings are about how to generate sequences.. not really about
- parsing.. This should live somewhere else. This is model cfg, not parse-cfg -}
-
-data ParseCfg = ParseCfg
-  { _composeKey :: Keyname -- ^ keyname of keycode to use as a compose-key
-  } deriving (Eq, Show)
-makeClassy ''ParseCfg
-
-instance Default ParseCfg where
-  def = ParseCfg "cmp"
 
 {- SECTION: task configs ------------------------------------------------------}
 
@@ -130,15 +119,13 @@ instance Default ParseCfg where
 data RunCfg = RunCfg
   { _rModelCfg  :: ModelCfg  -- ^ Cfg how the model is run
   , _rInputCfg  :: InputCfg  -- ^ Cfg how to grab input
-  , _rParseCfg  :: ParseCfg  -- ^ Cfg how to parse the config file
   , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
   } deriving (Eq, Show)
 makeClassy ''RunCfg
 
-instance Default RunCfg where def = RunCfg def def def def
+instance Default RunCfg where def = RunCfg def def def
 
 instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
-instance HasParseCfg  RunCfg where parseCfg  = rParseCfg
 instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
 instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 
@@ -149,15 +136,13 @@ instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 -- 2. Maybe parse a config file (to get at KeyI)
 data DiscoverCfg = DiscoverCfg
   { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
-  , _dParseCfg    :: ParseCfg  -- ^ Config how to parse the config file
   , _dumpKeyTable :: Bool      -- ^ Flag indicating whether to dump table
   , _escapeExits  :: Bool      -- ^ Flag indicating whether to exit on escape
   } deriving (Eq, Show)
 makeClassy ''DiscoverCfg
 
-instance Default     DiscoverCfg where def      = DiscoverCfg def def False True
+instance Default     DiscoverCfg where def      = DiscoverCfg def False True
 instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
-instance HasParseCfg DiscoverCfg where parseCfg = dParseCfg
 
 {- SECTION: task --------------------------------------------------------------}
 
@@ -171,6 +156,27 @@ makeClassyPrisms ''Task
 
 class HasTask a where task :: Lens' a Task
 instance HasTask Task where task = id
+
+-- | A traversal over an 'InputCfg' stored in a 'Task'
+--
+-- i.e. How to get at maybe an InputCfg in a Task
+taskInputCfg :: HasTask s => Traversal' s InputCfg
+taskInputCfg f s = case s^.task of
+  ParseTest  -> pure s
+  Run c      -> (\ic -> s & task._Run.inputCfg .~ ic)      <$> (f $ c^.inputCfg)
+  Discover c -> (\ic -> s & task._Discover.inputCfg .~ ic) <$> (f $ c^.inputCfg)
+{- ^NOTE: This one was difficult because both Run and Discover have an InputCfg -}
+
+-- | A traversal over an 'OutputCfg' stored in a 'Task'
+taskOutputCfg :: HasTask s => Traversal' s OutputCfg
+taskOutputCfg = task._Run.outputCfg
+
+-- | A traversal over a 'ModelCfg' stored in a 'Task'
+taskModelCfg :: HasTask s => Traversal' s ModelCfg
+taskModelCfg = task._Run.modelCfg
+
+
+{- SECTION: basic cfg ---------------------------------------------------------}
 
 -- | Configuration options that are required for everything in KMonad
 data BasicCfg = BasicCfg
@@ -211,11 +217,10 @@ instance HasKeyTable   BasicEnv where keyTable   = geKeyTable
 type CanBasic m env = ( EnvUIO m env, HasKeyTable env
                       , HasLogEnv env, HasBasicEnv env)
 
-{- NOTE: invocation -----------------------------------------------------------}
 
--- -- | The full 'Invocation' with which KMonad is called
--- data Invocation = Invocation
---   { _iBasicCfg :: BasicCfg -- ^ Basic configuration settings
---   , _task      :: Task      -- ^ What task we are instructed to perform
---   } deriving (Eq, Show)
--- makeClassy ''Invocation
+
+{- NOTE: What are the *actual* contexts I need
+base    -> we start here. Nothing is initialized, and we check the invocation.
+invoked -> we have the settings passed to Invoc, including the config file.
+...
+-}

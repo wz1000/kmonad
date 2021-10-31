@@ -23,7 +23,9 @@ import System.Keyboard.IO
 -- 3. Dispatch on the Task
 main :: OnlyIO ()
 main = do
-  bascfg <- onDef <$> getInvocation
+  invoc <- getInvocation
+  let bascfg = onDef invoc
+  pp $ invoc^.changes
   runBasic bascfg $ do
 
     sepDebug

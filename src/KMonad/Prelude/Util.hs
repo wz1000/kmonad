@@ -1,7 +1,7 @@
 {- For helpers that are so ubiquitous I want them everywhere -}
 module KMonad.Prelude.Util
   ( u
-  , pp
+  , ppIO
   , fi
   , inEnv
   , overMVar
@@ -30,8 +30,8 @@ u :: a
 u = undefined
 
 -- | useful to pretty-print a record when debugging
-pp :: (MonadIO m, Show a) => a -> m ()
-pp = pPrint
+ppIO :: (MonadIO m, Show a) => a -> m ()
+ppIO = pPrint
 
 -- | Shorthand for fromIntegral
 fi :: (Integral a, Num b) => a -> b

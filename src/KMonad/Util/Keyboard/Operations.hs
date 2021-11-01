@@ -3,7 +3,6 @@ module KMonad.Util.Keyboard.Operations
 where
 
 import KMonad.Prelude
-import KMonad.Util.Logging (dsp)
 import KMonad.Util.Keyboard.Types
 import KMonad.Util.Keyboard.OS (keycodeNames)
 

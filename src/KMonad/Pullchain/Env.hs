@@ -82,17 +82,17 @@ instance
   -- Injecting by adding to Dispatch's rerun buffer
   inject e = do
     di <- view dispatch
-    logDebug $ "Injecting event: " <> dsp e
+    logDebug $ "Injecting event: " <> textDisplay e
     Dp.rerun di [e]
 
   -- Shell-command through spawnCommand
   shellCmd t = do
     f <- view mAllowCmd
     if f then do
-      logInfo $ "Running command: " <> dsp t
+      logInfo $ "Running command: " <> textDisplay t
       spawnCommand . unpack $ t
     else
-      logInfo $ "Received but not running: " <> dsp t
+      logInfo $ "Received but not running: " <> textDisplay t
    where
     spawnCommand :: MonadIO m => String -> m ()
     spawnCommand cmd = void $ createProcess_ "spawnCommand"

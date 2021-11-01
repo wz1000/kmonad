@@ -11,15 +11,173 @@ where
 
 import KMonad.Prelude
 
--- import KMonad.App.KeyIO
--- import KMonad.Model.Types
-import KMonad.Util
+import KMonad.Util.Time
+import KMonad.App.Locale
+import KMonad.App.Logging
 
 import System.Keyboard
 
 import UnliftIO.Directory
 import qualified RIO.Text as T
 import RIO.FilePath
+
+
+
+
+{- SECTION: Functionality-specific configurations --------------------------------
+
+There are a number of 'functionalities' that KMonad supports. Each of these can
+be initialized independently of the other. We only ever initialize the
+functionalities required for the specific task we've been instructed to carry
+out.
+
+required for: r -> run, d -> discover, p -> parsetest
+
+| functionality | required for | description                             |
+|---------------+--------------+-----------------------------------------|
+| model         | r            | run a remapping model on keyboard input |
+| input         | rd           | capture keyboard input from OS          |
+| output        | r            | send keyboard output to OS              |
+| basic         | rdp          | logging, keytable                       |
+
+NOTE: we import input and output configuration types from System.Keyboard.
+-------------------------------------------------------------------------------}
+
+{- SUBSECTION: model ----------------------------------------------------------}
+
+-- | Config options pertinent to running a KMonad model
+data ModelCfg = ModelCfg
+  { _fallthrough :: Bool   -- ^ Whether to rethrow uncaught key events
+  , _macroDelay  :: Ms     -- ^ How long to pause between macro-taps
+  } deriving (Eq, Show)
+makeClassy ''ModelCfg
+
+instance Default ModelCfg where def = ModelCfg True 10
+
+
+{- SECTION: task configs ------------------------------------------------------}
+
+
+-- | Config describing how to run @kmonad run@
+--
+-- To do this we need to:
+-- 1. Parse a config file
+-- 2. Grab both KeyI and KeyO
+-- 3. Run the model
+data RunCfg = RunCfg
+  { _rModelCfg  :: ModelCfg  -- ^ Cfg how the model is run
+  , _rInputCfg  :: InputCfg  -- ^ Cfg how to grab input
+  , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
+  } deriving (Eq, Show)
+makeClassy ''RunCfg
+
+instance Default RunCfg where def = RunCfg def def def
+
+instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
+instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
+instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
+
+-- | Config describing how to run @kmonad discover@
+--
+-- To do this we need to:
+-- 1. Grab KeyI
+-- 2. Maybe parse a config file (to get at KeyI)
+data DiscoverCfg = DiscoverCfg
+  { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
+  , _dLocaleCfg   :: LocaleCfg -- ^ Config describing keyname/keycode correspondences
+  , _dumpKeyTable :: Bool      -- ^ Flag indicating whether to dump table
+  , _escapeExits  :: Bool      -- ^ Flag indicating whether to exit on escape
+  , _checkConfig  :: Bool      -- ^ Whether whe should load the config-file
+  } deriving (Eq, Show)
+makeClassy ''DiscoverCfg
+
+instance Default DiscoverCfg where
+  def = DiscoverCfg def def False True False
+
+instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
+instance HasLocaleCfg DiscoverCfg where localeCfg = dLocaleCfg
+
+{- SECTION: task --------------------------------------------------------------}
+
+-- | The instruction being passed to KMonad
+data Task
+  = Run RunCfg           -- ^ Run KMonad as a keyboard remapper
+  | Discover DiscoverCfg -- ^ Print out information about an input device
+  | ParseTest            -- ^ Test if a configuration file parser without error
+  deriving (Eq, Show)
+makeClassyPrisms ''Task
+
+instance Default Task where def = Run def
+
+class HasTask a where task :: Lens' a Task
+instance HasTask Task where task = id
+
+-- | A traversal over an 'InputCfg' stored in a 'Task'
+--
+-- i.e. How to get at maybe an InputCfg in a Task
+taskInputCfg :: HasTask s => Traversal' s InputCfg
+taskInputCfg f s = case s^.task of
+  ParseTest  -> pure s
+  Run c      -> (\ic -> s & task._Run.inputCfg .~ ic)      <$> (f $ c^.inputCfg)
+  Discover c -> (\ic -> s & task._Discover.inputCfg .~ ic) <$> (f $ c^.inputCfg)
+{- ^NOTE: This one was difficult because both Run and Discover have an InputCfg -}
+
+-- | A traversal over an 'OutputCfg' stored in a 'Task'
+taskOutputCfg :: HasTask s => Traversal' s OutputCfg
+taskOutputCfg = task._Run.outputCfg
+
+-- | A traversal over a 'ModelCfg' stored in a 'Task'
+taskModelCfg :: HasTask s => Traversal' s ModelCfg
+taskModelCfg = task._Run.modelCfg
+
+
+{- SECTION: basic cfg ---------------------------------------------------------}
+
+-- | Configuration options that are required for everything in KMonad
+data RootCfg = RootCfg
+  { _rLogCfg     :: LogCfg
+  , _bcTask      :: Task           -- ^ The instruction passed to KMonad
+  , _cmdAllow    :: Bool           -- ^ Whether to allow KMonad to call shell commands
+  , _cfgFile     :: Maybe FilePath -- ^ Where to look for a config file
+  } deriving (Eq, Show)
+makeClassy ''RootCfg
+
+instance HasLogCfg    RootCfg where logCfg    = rLogCfg
+
+instance Default RootCfg where
+  def = RootCfg
+    { _rLogCfg     = def
+    , _bcTask      = def
+    , _cmdAllow    = False
+    , _cfgFile     = Nothing
+    }
+
+-- | The first runtime environment available to all of KMonad
+data RootEnv = RootEnv
+  { _geRootCfg   :: RootCfg
+  , _geLogEnv    :: LogEnv
+  }
+makeClassy ''RootEnv
+
+instance HasRootCfg   RootEnv where rootCfg   = geRootCfg
+instance HasLogEnv    RootEnv where logEnv    = geLogEnv
+
+type CanRoot m env = ( EnvUIO m env, HasLogEnv env, HasRootEnv env
+                     , HasRootCfg env )
+
+instance HasTask RootCfg where task = bcTask
+
+-- | Run a function that requires a 'RootEnv' using a 'RootCfg'
+runRoot :: (UIO m, HasRootCfg c) => c -> (RootEnv -> m a) -> m a
+runRoot c f = withLog (c^.rootCfg.logCfg) $ f . RootEnv (c^.rootCfg)
+
+
+{- NOTE: What are the *actual* contexts I need
+base    -> we start here. Nothing is initialized, and we check the invocation.
+invoked -> we have the settings passed to Invoc, including the config file.
+...
+-}
+
 
 --------------------------------------------------------------------------------
 -- $appcfg
@@ -71,156 +229,3 @@ import RIO.FilePath
 -- instance HasModelAPI AppEnv where modelAPI = aeModelAPI
 
 -- type App a = RIO AppEnv a
-
-
---------------------------------------------------------------------------------
-
-{- SECTION: Functionality-specific configurations --------------------------------
-
-There are a number of 'functionalities' that KMonad supports. Each of these can
-be initialized independently of the other. We only ever initialize the
-functionalities required for the specific task we've been instructed to carry
-out.
-
-required for: r -> run, d -> discover, p -> parsetest
-
-| functionality | required for | description                             |
-|---------------+--------------+-----------------------------------------|
-| model         | r            | run a remapping model on keyboard input |
-| input         | rd           | capture keyboard input from OS          |
-| output        | r            | send keyboard output to OS              |
-| basic         | rdp          | logging, keytable                       |
-
-NOTE: we import input and output configuration types from System.Keyboard.
--------------------------------------------------------------------------------}
-
-{- SUBSECTION: model ----------------------------------------------------------}
-
--- | Config options pertinent to running a KMonad model
-data ModelCfg = ModelCfg
-  { _fallthrough :: Bool   -- ^ Whether to rethrow uncaught key events
-  , _macroDelay  :: Ms     -- ^ How long to pause between macro-taps
-  , _composeKey  :: Keyname -- ^ keyname of keycode to use as a compose-key
-  } deriving (Eq, Show)
-makeClassy ''ModelCfg
-
-instance Default ModelCfg where def = ModelCfg True 10 "cmp"
-
-
-{- SECTION: task configs ------------------------------------------------------}
-
-
--- | Config describing how to run @kmonad run@
---
--- To do this we need to:
--- 1. Parse a config file
--- 2. Grab both KeyI and KeyO
--- 3. Run the model
-data RunCfg = RunCfg
-  { _rModelCfg  :: ModelCfg  -- ^ Cfg how the model is run
-  , _rInputCfg  :: InputCfg  -- ^ Cfg how to grab input
-  , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
-  } deriving (Eq, Show)
-makeClassy ''RunCfg
-
-instance Default RunCfg where def = RunCfg def def def
-
-instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
-instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
-instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
-
--- | Config describing how to run @kmonad discover@
---
--- To do this we need to:
--- 1. Grab KeyI
--- 2. Maybe parse a config file (to get at KeyI)
-data DiscoverCfg = DiscoverCfg
-  { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
-  , _dumpKeyTable :: Bool      -- ^ Flag indicating whether to dump table
-  , _escapeExits  :: Bool      -- ^ Flag indicating whether to exit on escape
-  } deriving (Eq, Show)
-makeClassy ''DiscoverCfg
-
-instance Default     DiscoverCfg where def      = DiscoverCfg def False True
-instance HasInputCfg DiscoverCfg where inputCfg = dInputCfg
-
-{- SECTION: task --------------------------------------------------------------}
-
--- | The instruction being passed to KMonad
-data Task
-  = Run RunCfg           -- ^ Run KMonad as a keyboard remapper
-  | Discover DiscoverCfg -- ^ Print out information about an input device
-  | ParseTest            -- ^ Test if a configuration file parser without error
-  deriving (Eq, Show)
-makeClassyPrisms ''Task
-
-class HasTask a where task :: Lens' a Task
-instance HasTask Task where task = id
-
--- | A traversal over an 'InputCfg' stored in a 'Task'
---
--- i.e. How to get at maybe an InputCfg in a Task
-taskInputCfg :: HasTask s => Traversal' s InputCfg
-taskInputCfg f s = case s^.task of
-  ParseTest  -> pure s
-  Run c      -> (\ic -> s & task._Run.inputCfg .~ ic)      <$> (f $ c^.inputCfg)
-  Discover c -> (\ic -> s & task._Discover.inputCfg .~ ic) <$> (f $ c^.inputCfg)
-{- ^NOTE: This one was difficult because both Run and Discover have an InputCfg -}
-
--- | A traversal over an 'OutputCfg' stored in a 'Task'
-taskOutputCfg :: HasTask s => Traversal' s OutputCfg
-taskOutputCfg = task._Run.outputCfg
-
--- | A traversal over a 'ModelCfg' stored in a 'Task'
-taskModelCfg :: HasTask s => Traversal' s ModelCfg
-taskModelCfg = task._Run.modelCfg
-
-
-{- SECTION: basic cfg ---------------------------------------------------------}
-
--- | Configuration options that are required for everything in KMonad
-data BasicCfg = BasicCfg
-  { _logLevel    :: LogLevel       -- ^ Logging level
-  , _logSections :: Bool           -- ^ Used to enable section-breaks in logging
-  , _keyTableCfg :: KeyTableCfg    -- ^ Table of name-keycode correspondences
-  , _cmdAllow    :: Bool           -- ^ Whether to allow KMonad to call shell commands
-  , _cfgFile     :: Maybe FilePath -- ^ Where to look for a config file
-  , _bcTask      :: Task           -- ^ The instruction passed to KMonad
-  } deriving (Eq, Show)
-makeClassy ''BasicCfg
-
-instance Default BasicCfg where
-  def = BasicCfg
-    { _logLevel    = LevelWarn
-    , _logSections = True
-    , _keyTableCfg = EnUS
-    , _cmdAllow    = False
-    , _cfgFile     = Nothing
-    , _bcTask      = Run def
-    }
-
-instance HasTask BasicCfg where task = bcTask
-
-{- NOTE: global environment ---------------------------------------------------}
-
--- | The first runtime environment available to all of KMonad
-data BasicEnv = BasicEnv
-  { _geBasicCfg :: BasicCfg
-  , _geLogEnv   :: LogEnv
-  , _geKeyTable :: KeyTable
-  }
-makeClassy ''BasicEnv
-
-instance HasLogEnv     BasicEnv where logEnv     = geLogEnv
-instance HasKeyTable   BasicEnv where keyTable   = geKeyTable
-
-type CanBasic m env = ( EnvUIO m env, HasKeyTable env
-                      , HasLogEnv env, HasBasicEnv env)
-
-
-
-{- NOTE: What are the *actual* contexts I need
-base    -> we start here. Nothing is initialized, and we check the invocation.
-invoked -> we have the settings passed to Invoc, including the config file.
-...
--}

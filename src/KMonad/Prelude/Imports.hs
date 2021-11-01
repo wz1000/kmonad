@@ -33,9 +33,9 @@ import RIO as X hiding
   , some, many
 
     -- Names I'd like to use myself
-  , wait, timeout
+  , wait, timeout, log
 
-    -- Hiding these for simpler logging (see KMonad.Util.Logging)
+    -- Hiding these to redefine them as 'Text -> m ()'
   , logError, logWarn, logInfo, logDebug
 
     -- Hiding these because I want to rename IO to OnlyIO to be more explicit
@@ -43,5 +43,6 @@ import RIO as X hiding
 
     -- This is causing errors for some reason:
   , catchIO
+
 
   )

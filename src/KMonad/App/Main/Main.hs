@@ -4,7 +4,7 @@ module KMonad.App.Main.Main ( main ) where
 
 import KMonad.Prelude
 
-import KMonad.Util.Logging
+import KMonad.App.Logging
 
 import KMonad.App.Invocation    (getInvocation)
 import KMonad.App.Main.Discover (runDiscover)
@@ -24,15 +24,16 @@ import System.Keyboard.IO
 main :: OnlyIO ()
 main = do
   invoc <- getInvocation
-  let bascfg = onDef invoc
-  pp $ invoc^.changes
-  runBasic bascfg $ do
+  let cfg = onDef invoc
+  runRoot cfg $ do
 
-    sepDebug
-    logDebug "Starting KMonad with the following configuration:"
-    logDebug . ppRecord $ bascfg
+    sep >> log "Welcome to KMonad"
+    sep >> log "Invocation made the following changes:"
+    pp $ invoc^.changes
+    sep >> log "Starting KMonad with the following configuration:"
+    pp cfg
 
-    runTask $ bascfg^.task
+    runTask
 
   -- let logcfg = (def :: LogCfg)
   --       & logLvl .~ (bascfg^.logLevel)
@@ -45,14 +46,15 @@ main = do
     -- withKeyTable (bascfg^.keyTableCfg) $ \keytbl -> do
 
     --   let basenv = BasicEnv
-    --             { _geBasicCfg   = bascfg
+    --             { _geRootCfg   = bascfg
     --             , _geLogEnv     = logenv
     --             , _geKeyTable   = keytbl
     --             }
 
 
 -- | Run the task
-runTask :: CanBasic m env => Task -> m ()
-runTask (Discover cfg) = runDiscover cfg
-runTask ParseTest = logError "parsetest!"
-runTask (Run cfg) = runRun cfg
+runTask :: CanRoot m env => Task -> m ()
+runTask = view task >>= \case
+  (Discover cfg) -> runDiscover cfg
+  ParseTest      -> atError $ log "parsetest!"
+  (Run cfg)      -> runRun cfg

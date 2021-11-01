@@ -29,8 +29,10 @@ import KMonad.Prelude
 
 import Data.Monoid
 
+import KMonad.App.Locale
+import KMonad.App.Logging
 import KMonad.App.Types
-import KMonad.Util.Logging
+
 import KMonad.Util.Name
 import KMonad.Util.Time
 
@@ -105,8 +107,8 @@ mkChange c = Change [c] . Endo
 liftChange :: Traversal' s a -> Change a -> Change s
 liftChange l (Change cs (Endo f)) = Change cs (Endo $ over l f)
 
--- | Any change to the root 'BasicCfg' structure
-type ReCfg = Change BasicCfg
+-- | Any change to the root 'RootCfg' structure
+type CfgChange = Change RootCfg
 
 {- SUBSECTION: ArgParse --------------------------------------------------------
 I'd like to use ReadM from optparse-applicative directly, but I can't find a way
@@ -171,9 +173,9 @@ runFlag :: Flag s -> Change s
 runFlag = _fChange
 
 -- | Existential wrapper around a flag specified on some existing cfg and an
--- embedding of that cfg into a BasicCfg
+-- embedding of that cfg into a RootCfg
 data AnyFlag = forall s. AnyFlag
-  { fEmbed :: Traversal' BasicCfg s
+  { fEmbed :: Traversal' RootCfg s
   , fFlag  :: Flag s
   }
 -- NOTE: this doesn't work here: makeLenses ''AnyFlag. Because existential?
@@ -191,8 +193,8 @@ instance HasDescription AnyFlag where
     (\(AnyFlag _ f)   -> f^.description)
     (\(AnyFlag e f) n -> AnyFlag e $ f & description .~ n)
 
--- | How to apply 'AnyFlag' to a 'BasicCfg'
-runAnyFlag :: AnyFlag -> Change BasicCfg
+-- | How to apply 'AnyFlag' to a 'RootCfg'
+runAnyFlag :: AnyFlag -> Change RootCfg
 runAnyFlag (AnyFlag l f) = liftChange l $ runFlag f
 
 {- SUBSECTION: Option ---------------------------------------------------------}
@@ -215,9 +217,9 @@ mkOption n l a d = Option n d a
   (\x -> mkChange ("option:" <> n <> ":" <> tshow x) $ set l x)
 
 -- | Existential wrapper around an option on some configuration and an embedding
--- of that configuration into a BasicCfg
+-- of that configuration into a RootCfg
 data AnyOption = forall s. AnyOption
-  { oEmbed  :: Traversal' BasicCfg s
+  { oEmbed  :: Traversal' RootCfg s
   , oOption :: Option s}
 
 instance HasName AnyOption where
@@ -230,8 +232,8 @@ instance HasDescription AnyOption where
     (\(AnyOption _ o)   -> o^.description)
     (\(AnyOption e o) n -> AnyOption e $ o & description .~ n)
 
--- | Apply an option-change to a BasicCfg
-runAnyOption :: AnyOption -> Text -> Either ConfigurableException ReCfg
+-- | Apply an option-change to a RootCfg
+runAnyOption :: AnyOption -> Text -> Either ConfigurableException CfgChange
 runAnyOption (AnyOption l o) t = liftChange l <$> readOption o t
 
 
@@ -299,49 +301,87 @@ logLevelArg = Arg "log level" . parseMatch $
   , ("info"  , LevelInfo)
   , ("debug" , LevelDebug) ]
 
+-- | An argument that accepts a LogColor string
+logColorArg :: Arg LogColor
+logColorArg = Arg "log color" . parseMatch $
+  [ ("dark-bg" , DarkBG)
+  , ("light-bg", LightBG)
+  , ("none"    , Monochrome) ]
+
+-- | Parse 'on' as True and 'off' as False
+onOffArg :: Arg Bool
+onOffArg = Arg "on or off" . parseMatch $
+  [("on", True) , ("off", False)]
+
 {- SUBSECTION: Overview -------------------------------------------------------}
 
 allFlags :: Named AnyFlag
 allFlags = mconcat
-  [basicFlags, inputFlags, outputFlags, modelFlags, discoverFlags]
+  [ basicFlags, logFlags, localeFlags, inputFlags
+  , outputFlags, modelFlags, discoverFlags]
 
 allOptions :: Named AnyOption
 allOptions = mconcat
-  [basicOptions, inputOptions, outputOptions, modelOptions, discoverOptions]
+  [ basicOptions, logOptions, localeOptions, inputOptions
+  , outputOptions, modelOptions, discoverOptions]
 
-{- SUBSECTION: BasicCfg -------------------------------------------------------}
+{- SUBSECTION: RootCfg -------------------------------------------------------}
 
 basicFlags :: Named AnyFlag
 basicFlags = byName . map (AnyFlag id) $
   [
-    mkFlag "verbose" logLevel LevelDebug
-      "Make KMonad very verbose: same as log-level debug"
-
-  , mkFlag "sections-off" logSections False
-      "Disable printing section separators while logging"
-
-  , mkFlag "sections-on" logSections True
-      "Enable printing section separators while logging"
-
-  , mkFlag "commands-on" cmdAllow True
-      "Enable the execution of external commands"
-
-  , mkFlag "commands-off" cmdAllow False
-      "Disable the execution of external commands (safe-mode)"
+    mkFlag "safe-mode" cmdAllow False
+      "Turn of command-execution, same as `--commands off`"
   ]
-
 
 basicOptions :: Named AnyOption
 basicOptions = byName . map (AnyOption id) $
   [
-    mkOption "log-level" logLevel logLevelArg
-      "Logging verbosity: debug > info > warn > error"
-
-  , mkOption "config-file" cfgFile (Just <$> fileArg)
+    mkOption "config-file" cfgFile (Just <$> fileArg)
       "File containing kmonad's keymap configuration"
 
-  , mkOption "key-table" keyTableCfg (CustomTable <$> fileArg)
-      "File containing kmonad's keytable configuration"
+  , mkOption "commands" cmdAllow onOffArg
+      "Whether KMonad is able to execute shell-commands"
+  ]
+
+{- SUBSECTION: Logging --------------------------------------------------------}
+
+logFlags :: Named AnyFlag
+logFlags = byName . map (AnyFlag logCfg) $
+  [
+    mkFlag "verbose" logLevel LevelDebug
+      "Make KMonad very verbose: same as log-level debug"
+  ]
+
+logOptions :: Named AnyOption
+logOptions = byName . map (AnyOption logCfg) $
+  [
+    mkOption "log-level" logLevel logLevelArg
+      "Logging verbosity: 'debug' > 'info' > 'warn' > 'error'"
+
+  , mkOption "log-sections" useSep onOffArg
+      "Whether to use section separators in the logging output"
+
+  , mkOption "log-color" logColor logColorArg
+      "What kind of coloring to use, for 'dark-bg', 'light-bg', or 'none'"
+  ]
+
+{- SUBSECTION: Locale ---------------------------------------------------------}
+
+localeFlags :: Named AnyFlag
+localeFlags = byName []
+
+localeOptions :: Named AnyOption
+localeOptions = byName . map (AnyOption localeCfg) $
+  [
+    mkOption "key-table" keyTableCfg (CustomTable <$> fileArg)
+      "File from which to load a tabular keytable"
+
+  , mkOption "compose-key" composeKey txtArg
+      "Keyname for key to use as compose key in symbol-macros"
+
+  , mkOption "std-shift" stdShift txtArg
+      "Keyname for key to use as shift in shifted-macros"
   ]
 
 {- SUBSECTION: ModelCfg -------------------------------------------------------}
@@ -362,8 +402,8 @@ modelOptions = byName . map (AnyOption taskModelCfg) $
     mkOption "macro-delay" macroDelay msArg
       "Time (ms) between taps when sending keyboard macros to the OS"
 
-  , mkOption "compose-key" composeKey txtArg
-      "The key used to signal the beginning of a compose-sequence to the OS"
+  , mkOption "fallthrough" fallthrough onOffArg
+      "Whether to retransmit uncaught events"
   ]
 
 {- SUBSECTION: InputCfg -------------------------------------------------------}
@@ -415,6 +455,9 @@ discoverFlags = byName . map (AnyFlag (task._Discover)) $
 
   , mkFlag "inescapable" escapeExits False
       "Do not exit `discover` on pressing escape"
+
+  , mkFlag "check-config" checkConfig True
+      "If passed, also load the config-file to check for options"
   ]
 
 discoverOptions :: Named AnyOption

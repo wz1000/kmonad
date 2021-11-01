@@ -374,13 +374,13 @@ prs p t = case runParser p "" t of
 
 
 tcfg :: OnlyIO ()
-tcfg = pp =<< prs (sc >> kcfg) cfg
+tcfg = ppIO =<< prs (sc >> kcfg) cfg
 
 tsrc :: OnlyIO ()
-tsrc = pp =<< prs (sc >> ksrc) src
+tsrc = ppIO =<< prs (sc >> ksrc) src
 
 tals :: OnlyIO ()
-tals = pp =<< prs (sc >> kals) als
+tals = ppIO =<< prs (sc >> kals) als
 
 tfull :: OnlyIO ()
-tfull = pp =<< prs ktokens myCfg
+tfull = ppIO =<< prs ktokens myCfg

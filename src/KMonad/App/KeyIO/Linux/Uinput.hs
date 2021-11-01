@@ -100,7 +100,7 @@ send_event (Fd h) e = liftIO $ void $ c_send_event h
 -- | Send a linux key-event to the OS
 sendEvent :: EvType -> Keycode -> U ()
 sendEvent s c = do
-  logDebug $ "Putting: " <> dsp s <> " " <> dsp c
+  logDebug $ "Putting: " <> textDisplay s <> " " <> textDisplay c
   h <- view kbf
 
   -- Make and send the actual event

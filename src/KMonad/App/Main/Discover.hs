@@ -5,8 +5,10 @@ module KMonad.App.Main.Discover where
 
 import KMonad.Prelude
 
+import KMonad.App.Locale
+import KMonad.App.Logging
 import KMonad.App.Types
-import KMonad.Util.Logging
+
 
 import System.Keyboard
 import System.Keyboard.IO
@@ -54,18 +56,19 @@ Waiting for you to press a key:
 
 {- NOTE: types ----------------------------------------------------------------}
 
-data DiscEnv = DiscEnv
-  { _deLog  :: LogEnv       -- ^ The logging environment
-  , _deKeyI :: KeyI         -- ^ The key-input environment
-  , _deKeyTable :: KeyTable -- ^ The keycode table
+data DiscoverEnv = DiscoverEnv
+  { _deLogEnv    :: LogEnv    -- ^ The logging environment
+  , _deLocaleEnv :: LocaleEnv -- ^ The locale environment
+  , _deKeyI      :: KeyI      -- ^ The key-input environment
+  , _deKeyTable  :: KeyTable  -- ^ The keycode table
   }
-makeClassy ''DiscEnv
+makeClassy ''DiscoverEnv
 
-instance HasLogEnv   DiscEnv where logEnv   = deLog
-instance HasKeyI     DiscEnv where keyI     = deKeyI
-instance HasKeyTable DiscEnv where keyTable = deKeyTable
+instance HasLogEnv   DiscoverEnv where logEnv   = deLogEnv
+instance HasKeyI     DiscoverEnv where keyI     = deKeyI
+instance HasKeyTable DiscoverEnv where keyTable = deKeyTable
 
-type D a = RIO DiscEnv a
+type D a = RIO DiscoverEnv a
 
 {- SECTION: Exception ---------------------------------------------------------}
 
@@ -83,8 +86,8 @@ instance Exception DiscoverException where
 
 {- SECTION: io -------------------------------------------------------------------}
 
-runDiscover :: CanBasic m env => DiscoverCfg -> m ()
-runDiscover cfg = if cfg^.dumpKeyTable then logError tableEnUSText else do
+runDiscover :: CanRoot m env => DiscoverCfg -> m ()
+runDiscover cfg = if cfg^.dumpKeyTable then atError $ log tableEnUSText else do
 
   logenv <- view logEnv
   keytbl <- view keyTable
@@ -97,14 +100,14 @@ runDiscover cfg = if cfg^.dumpKeyTable then logError tableEnUSText else do
     _              -> throwIO (NoEscapeCode keytbl)
 
   withKeyI (cfg^.inputCfg) $ \ki -> do
-    let dscenv = DiscEnv
-                   { _deLog      = logenv
-                   , _deKeyI     = ki
-                   , _deKeyTable = keytbl
+    let dscenv = DiscoverEnv
+                   { _deLogEnv    = logenv
+                   , _deKeyI      = ki
+                   , _deLocaleEnv = locenv
                    }
     runRIO dscenv $ do
 
-      sepInfo >> logInfo greeting
+      atInfo $ sep >> log greeting
       let step = do k <- getKey
                     discoverReport k
                     unless (isDone k) step
@@ -112,13 +115,13 @@ runDiscover cfg = if cfg^.dumpKeyTable then logError tableEnUSText else do
 
 
 discoverReport :: KeySwitch -> D ()
-discoverReport s = do
-  sepError
-  logError $ "Type:    " <> tshow (s^.switch)
-  logError $ "Keycode: " <> tshow (s^.keycode)
+discoverReport s = atError $ do
+  sep
+  log $ "Type:    " <> tshow (s^.switch)
+  log $ "Keycode: " <> tshow (s^.keycode)
 
   view (namesForCode s) >>= \case
-    []  -> logError "We have no names on file for this key."
-    [k] -> dspError k
-    ks  -> do logError "We have multiple names on file for this key: "
-              mapM_ dspError ks
+    []  -> log "We have no names on file for this key."
+    [k] -> dsp k
+    ks  -> do log "We have multiple names on file for this key: "
+              mapM_ dsp ks

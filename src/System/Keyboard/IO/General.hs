@@ -24,7 +24,7 @@ getKey = view (keyI . uKeyI) >>= liftIO
 
 {- NOTE: KeyTable contexts ----------------------------------------------------}
 
-withKeyTable :: MonadUnliftIO m => KeyTableCfg -> (KeyTable -> m a) -> m a
+withKeyTable :: MonadIO m => KeyTableCfg -> (KeyTable -> m a) -> m a
 withKeyTable EnUS              f = f tableEnUS
 withKeyTable (CustomTable pth) f = f =<< readKeyTable <$> readFileUtf8 pth
 

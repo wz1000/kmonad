@@ -33,7 +33,7 @@ versioner = infoOption (showVersion version <> ", commit " <> $(gitHash))
   )
 
 -- | Parse exactly how this program was invoked.
-getInvocation :: OnlyIO ReCfg
+getInvocation :: OnlyIO CfgChange
 getInvocation = customExecParser (prefs showHelpOnEmpty) $
   info (invocationP <**> versioner <**> helper)
     (  fullDesc

@@ -15,17 +15,17 @@ import qualified RIO.Text    as T
 
 {- SECTION: Types and utilities -----------------------------------------------}
 
-type P = Parser ReCfg
+type P = Parser CfgChange
 
 -- | Extra mods to apply to specific flags
-fMods :: Named (Mod FlagFields ReCfg)
+fMods :: Named (Mod FlagFields CfgChange)
 fMods = M.fromList
   [ ( "verbose"      , short 'v' )
   , ( "commands-off" , short 's' )
   ]
 
 -- | Extra mods to apply to specific options
-oMods :: Named (Mod OptionFields ReCfg)
+oMods :: Named (Mod OptionFields CfgChange)
 oMods = M.fromList
   [ ( "config-file" , short 'f' <> metavar "FILE" )
   , ( "key-table"   , short 'k' <> metavar "FILE")
@@ -61,9 +61,9 @@ pConcat ps = mconcat <$> sequenceA ps
 
 {- SUBSECTION: Top-level and task parsers -------------------------------------}
 
--- | Parse the top-level change to the default BasicCfg passed on the cmd-line
+-- | Parse the top-level change to the default RootCfg passed on the cmd-line
 invocationP :: P
-invocationP = pConcat [ basicCfgP, taskP ]
+invocationP = pConcat [ rootCfgP, taskP ]
 
 -- | Parse the task as a subcommand
 taskP :: P
@@ -76,9 +76,9 @@ taskP = hsubparser $ mconcat
       ParseTest []
   ]
   where
-    mkOne :: Name -> Description -> Task -> [P] -> (Mod CommandFields ReCfg)
+    mkOne :: Name -> Description -> Task -> [P] -> (Mod CommandFields CfgChange)
     mkOne n d t ps =
-      let p_  = pConcat $ ps <> [basicCfgP] <> [pure tsk]
+      let p_  = pConcat $ ps <> [rootCfgP] <> [pure tsk]
           -- ^ Concat all parsers into 1, *order is important*
           tsk = mkChange ("task:" <> n) (\c -> c & task .~ t)
           -- ^ Create a task for the provided settings
@@ -97,8 +97,8 @@ mkCfg fs os = pConcat $ (map fromFlag   . M.elems $ fs)
 -- currently only used by the 'Run' task, but I anticipate a few more tasks that
 -- might/will need access to these settings. So the seperation has been made for
 -- clarify of context and in preparation for these developments.
-basicCfgP, modelCfgP, inputCfgP, outputCfgP, discoverCfgP :: P
-basicCfgP    = mkCfg basicFlags    basicOptions
+rootCfgP, modelCfgP, inputCfgP, outputCfgP, discoverCfgP :: P
+rootCfgP    = mkCfg basicFlags    basicOptions
 modelCfgP    = mkCfg modelFlags    modelOptions
 inputCfgP    = mkCfg inputFlags    inputOptions
 outputCfgP   = mkCfg outputFlags   outputOptions

@@ -20,7 +20,7 @@ import KMonad.App.Parser.Test -- FIXME: Remove when done
 - To get all configurables we need to grok at least part of the `defcfg` blocks
 
 ERGO: We need grokking to be a 2 phase process:
-1. Base context, extract all defcfg blocks, grok into Change BasicCfg
+1. Base context, extract all defcfg blocks, grok into Change RootCfg
 2. Basic context, parse the other blocks using the now present keytable
 -------------------------------------------------------------------------------}
 
@@ -33,20 +33,20 @@ data GrokException
 {- SECTION: extract configureables --------------------------------------------}
 
 -- | Turn all KSettings in a collection of tokens into a config-update.
-grokSettings :: KTokens -> Either ConfigurableException ReCfg
+grokSettings :: KTokens -> Either ConfigurableException CfgChange
 grokSettings ks = do
   fs <- foldMapM grokFlag   $ ks^..folded._KCfg.folded.uKSetting._Left
   os <- foldMapM grokOption $ ks^..folded._KCfg.folded.uKSetting._Right
   pure $ fs <> os
 
--- | Turn a flag name into an edit of the BasicCfg
-grokFlag :: FlagName -> Either ConfigurableException ReCfg
+-- | Turn a flag name into an edit of the RootCfg
+grokFlag :: FlagName -> Either ConfigurableException CfgChange
 grokFlag f = case allFlags ^. at f of
   Nothing -> Left  $ UnknownConfigurable f
   Just f  -> Right $ runAnyFlag f
 
--- | Turn an option (name, value) pair into an edit of the BasicCfg
-grokOption :: (OptionName, Text) -> Either ConfigurableException ReCfg
+-- | Turn an option (name, value) pair into an edit of the RootCfg
+grokOption :: (OptionName, Text) -> Either ConfigurableException CfgChange
 grokOption (o, t) = case allOptions ^. at o of
   Nothing -> Left $ UnknownConfigurable o
   Just o_ -> runAnyOption o_ t

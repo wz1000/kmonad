@@ -3,11 +3,11 @@ module KMonad.App.Main.Run
 where
 
 import KMonad.Prelude
+import KMonad.App.Logging
 import KMonad.App.Types
-import KMonad.Util.Logging
 
-runRun :: CanBasic m env => RunCfg -> m ()
-runRun _ = logError "Run!"
+runRun :: CanRoot m env => RunCfg -> m ()
+runRun _ = atError $ log "Run!"
 
 -- import KMonad.App.KeyIO
 -- import KMonad.App.Types

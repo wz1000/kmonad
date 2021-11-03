@@ -67,7 +67,7 @@ log t = view logAt >>= \case
   LevelInfo  -> liftLog R.logInfo  t
   LevelWarn  -> liftLog R.logWarn  t
   LevelError -> liftLog R.logError t
-  _          -> pure ()
+  _          -> nil
   where liftLog f t = view logFunc >>= \lf -> runRIO lf . f . display $ t
 
 -- | Pretty-print a haskell-value

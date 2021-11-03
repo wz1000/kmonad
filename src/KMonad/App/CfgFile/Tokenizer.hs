@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 -- |
-module KMonad.App.Parser.Tokenizer where
+module KMonad.App.CfgFile.Tokenizer where
 
 
 import KMonad.Prelude hiding (try)
@@ -10,7 +10,7 @@ import KMonad.Util.Name
 import KMonad.Util.Time
 import System.Keyboard
 
-import KMonad.App.Parser.Test -- FIXME: Remove when done
+-- import KMonad.App.Parser.Test -- FIXME: Remove when done
 
 import Data.Char
 
@@ -20,8 +20,9 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
 import RIO.List (sortBy)
-import qualified RIO.Text as T
 import RIO.Partial (read)
+import qualified RIO.HashMap as M
+import qualified RIO.Text as T
 
 {- OVERVIEW: what do we do here? -----------------------------------------------
 
@@ -61,13 +62,13 @@ Here we:
 type P a = Parsec Void Text a
 
 -- | The type of errors returned by the Megaparsec parsers
-newtype PErrors = PErrors (ParseErrorBundle Text Void)
+newtype TokenizeError = TokenizeError (ParseErrorBundle Text Void)
   deriving Eq
 
-instance Show PErrors where
-  show (PErrors e) = "Parse error at " <> errorBundlePretty e
+instance Show TokenizeError where
+  show (TokenizeError e) = "Parse error at " <> errorBundlePretty e
 
-instance Exception PErrors
+instance Exception TokenizeError
 
 {- SUBSECTION: KExprs ---------------------------------------------------------}
 
@@ -107,11 +108,19 @@ data KExpr
 makePrisms ''KBlock
 makePrisms ''KExpr
 
+{- SECTION: API ---------------------------------------------------------------}
+
+-- | Tokenize text into a set of KTokens
+tokenize :: Text -> Either TokenizeError KTokens
+tokenize t = case runParser ktokens "" t of
+  Left  e -> Left . TokenizeError $ e
+  Right a -> Right a
+
 {- SECTION: Utils -------------------------------------------------------------}
 
 -- | Predicate describing the set of prefix characters
 isPrefixChar :: Char -> Bool
-isPrefixChar = (`elem` ("@#:" :: String))
+isPrefixChar = (`elem` ("@#:+" :: String))
 
 -- | Predicate describing the set of reserved characters
 isReservedChar :: Char -> Bool
@@ -224,16 +233,10 @@ matchOne = choice . map (try . string) . descendOn id . toList
 -}
 
 kflagname :: P FlagName
-kflagname = lexeme . matchOne $
-  [ "verbose", "sections-off", "sections-on", "commands-on", "commands-off"
-  , "fallthrough-off", "fallthrough-on" ]
+kflagname = lexeme . matchOne $ M.keys allFlags
 
 koptname :: P OptionName
-koptname = lexeme . matchOne $
-  [ "log-level", "key-table", "macro-delay", "compose-key" , "evdev-device-file"
-  , "iokit-device-name", "start-delay" , "uinput-device-name", "repeat-rate"
-  , "repeat-delay" , "post-init-cmd", "pre-init-cmd"
-  ]
+koptname = lexeme . matchOne $ M.keys allOptions
 
 kopt :: P (OptionName, Text)
 kopt = (,) <$> koptname <*>
@@ -289,9 +292,6 @@ these things: only obvious once understood.
 kcfg :: P KBlock
 kcfg = KCfg <$> many ksetting
 
-
--- KCfg <$> pairs (word <?> "setting name") (str <|> word <?> "setting value")
-
 -- | Parse a defsrc block by:
 ksrc :: P KBlock
 ksrc = KSrc <$> some keyname
@@ -313,6 +313,7 @@ kexpr = choice $
   , ktapmacro
   , kkeylit
   , kderef
+  , kdeadkey
   , kkeyword
   , kpause
   , kword -- This must be last, it will match many things
@@ -360,6 +361,12 @@ ktapmacro = label "#-prefixed tap-macro" $ do
   args <- paren $ some kexpr
   pure $ KList "tap-macro" args
 
+kdeadkey :: P KExpr
+kdeadkey = label "+-prefixed dead-key sequence" $ do
+  _    <- prefix $ char '+'
+  arg  <- kword
+  pure $ KList "composed" [arg]
+
 {- FIXME: Delete rest-of-file when done ---------------------------------------}
 
 -- | Shorthand for debugging, maybe delete later
@@ -367,20 +374,20 @@ ktapmacro = label "#-prefixed tap-macro" $ do
 -- Very handy in the REPL, e.g.
 -- >> prs bool "true"
 -- True
-prs :: P a -> Text -> OnlyIO a
-prs p t = case runParser p "" t of
-  Left  e -> throwIO $ PErrors e
-  Right a -> pure a
+-- prs :: P a -> Text -> OnlyIO a
+-- prs p t = case runParser p "" t of
+--   Left  e -> throwIO $ TokenizeError e
+--   Right a -> pure a
 
 
-tcfg :: OnlyIO ()
-tcfg = ppIO =<< prs (sc >> kcfg) cfg
+-- tcfg :: OnlyIO ()
+-- tcfg = ppIO =<< prs (sc >> kcfg) cfg
 
-tsrc :: OnlyIO ()
-tsrc = ppIO =<< prs (sc >> ksrc) src
+-- tsrc :: OnlyIO ()
+-- tsrc = ppIO =<< prs (sc >> ksrc) src
 
-tals :: OnlyIO ()
-tals = ppIO =<< prs (sc >> kals) als
+-- tals :: OnlyIO ()
+-- tals = ppIO =<< prs (sc >> kals) als
 
-tfull :: OnlyIO ()
-tfull = ppIO =<< prs ktokens myCfg
+-- tfull :: OnlyIO ()
+-- tfull = ppIO =<< prs ktokens myCfg

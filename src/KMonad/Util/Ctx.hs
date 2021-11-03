@@ -5,7 +5,10 @@ module KMonad.Util.Ctx
   , runCtx_
   , nest
   , launch_
-  , around
+
+  , ctxBracket
+  , ctxLocal
+  , ctxFromWith
   )
 where
 
@@ -64,13 +67,10 @@ nest :: [Ctx r m a] -> Ctx r m [a]
 nest = sequenceA
 
 -- | Modify some action so that some command is running in the background,
--- forever, untill that action terminates.
+-- forever, until that action terminates.
 launch_ :: UIO m => m a -> Ctx r m ()
 launch_ go = mkCtx $ \f -> withAsync (forever go) (const $ f ())
 
--- | Do something before and after some action, even on exception.
-around :: UIO m => m b -> m c -> Ctx r m ()
-around before after = mkCtx $ \f -> bracket_ before after (f ())
 
 -- -- | Like `launch`
 -- launch_ :: HasLogFunc e
@@ -78,3 +78,22 @@ around before after = mkCtx $ \f -> bracket_ before after (f ())
 --   -> RIO e a -- ^ The action to repeat forever
 --   -> ContT r (RIO e) ()
 -- launch_ n a = ContT $ \next -> withLaunch_ n a (next ())
+
+-- | Do something before and after some action, even on exception.
+ctxBracket :: UIO m => m b -> m c -> Ctx r m ()
+ctxBracket before after = mkCtx $ \f -> bracket_ before after (f ())
+
+ctxLocal :: MonadReader s m => (ASetter s s a b) -> (a -> b) -> Ctx r m ()
+ctxLocal l f = mkCtx $ \g -> locally l f $ g ()
+
+-- | Turn a standard withABC into a ctxABC
+ctxFromWith :: Monad m
+  => (cfg -> (env -> m r) -> m r)
+  -> cfg
+  -> Ctx r m env
+ctxFromWith with c = mkCtx $ \f -> with c f
+
+ctxFromWith_ :: Monad m
+  => ((env -> m r) -> m r)
+  -> Ctx r m env
+ctxFromWith_ with = ctxFromWith (const with) ()

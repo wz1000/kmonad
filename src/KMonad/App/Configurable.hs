@@ -29,6 +29,7 @@ import KMonad.Prelude
 
 import Data.Monoid
 
+import KMonad.App.Cmds
 import KMonad.App.Locale
 import KMonad.App.Logging
 import KMonad.App.Types
@@ -83,32 +84,35 @@ instance Exception ConfigurableException where
 {- SUBSECTION: Change ---------------------------------------------------------}
 
 -- | A datatype representing some change to a structure
---
--- Note: the order of application to a value is *last first*.
--- therefore: (set a 1) <> (set a 2) <> (set a 3)
--- same as:   (set a 1)
 data Change s = Change
-  { _changes :: [Text] -- ^ Description of the changes applied
-  , _endo    :: Endo s -- ^ Function to apply the change
+  { _cDescrip :: Description
+  , _endo     :: Endo s
   }
 makeClassy ''Change
 
-instance Semigroup (Change s) where
-  a <> b = Change (a^.changes <> b^.changes) (a^.endo    <> b^.endo)
+instance HasDescription (Change s) where description = cDescrip
 
-instance Monoid (Change s) where
-  mempty = Change [] mempty
+-- | A list of changes, we make heavy use of the monoid properties
+type Changes s = [Change s]
 
--- | Create a new 'Change' value
-mkChange :: Text -> (s -> s) -> Change s
-mkChange c = Change [c] . Endo
+-- | Create a new 'Changes' value
+mkChange :: Text -> (s -> s) -> Changes s
+mkChange t = singleton . Change t . Endo
+
+-- | Create a 'Change' that sets some property to some value
+setProp :: Text -> Traversal' s a -> a -> Changes s
+setProp t l a = mkChange t (\s -> s & l .~ a)
+
+-- | Lift an endo into an endo over some larger structure using a traversal
+liftEndo :: Traversal' s a -> Endo a -> Endo s
+liftEndo l (Endo f) = (Endo $ over l f)
 
 -- | Lift a change into some larger structure with a traversal describing the embedding
 liftChange :: Traversal' s a -> Change a -> Change s
-liftChange l (Change cs (Endo f)) = Change cs (Endo $ over l f)
+liftChange l (Change d e) = Change d (liftEndo l e)
 
 -- | Any change to the root 'RootCfg' structure
-type CfgChange = Change RootCfg
+type CfgChange = Changes RootCfg
 
 {- SUBSECTION: ArgParse --------------------------------------------------------
 I'd like to use ReadM from optparse-applicative directly, but I can't find a way
@@ -157,7 +161,7 @@ instance Functor Arg where
 data Flag s = Flag
   { _fName        :: FlagName
   , _fDescription :: Text
-  , _fChange      :: Change s}
+  , _fChange      :: Changes s}
 makeLenses ''Flag
 
 instance HasName (Flag s) where name = fName
@@ -165,11 +169,10 @@ instance HasDescription (Flag s) where description = fDescription
 
 -- | Create a flag that sets some traversal to some fixed value when triggered
 mkFlag :: FlagName -> Traversal' s a -> a -> Text -> Flag s
-mkFlag n l a d = Flag n d
-  (mkChange ("flag:" <> n) $ set l a)
+mkFlag n l a d = Flag n d $ setProp ("flag:" <> n) l a
 
 -- | Extract the change from a flag
-runFlag :: Flag s -> Change s
+runFlag :: Flag s -> Changes s
 runFlag = _fChange
 
 -- | Existential wrapper around a flag specified on some existing cfg and an
@@ -194,8 +197,8 @@ instance HasDescription AnyFlag where
     (\(AnyFlag e f) n -> AnyFlag e $ f & description .~ n)
 
 -- | How to apply 'AnyFlag' to a 'RootCfg'
-runAnyFlag :: AnyFlag -> Change RootCfg
-runAnyFlag (AnyFlag l f) = liftChange l $ runFlag f
+runAnyFlag :: AnyFlag -> Changes RootCfg
+runAnyFlag (AnyFlag l f) = map (liftChange l) $ runFlag f
 
 {- SUBSECTION: Option ---------------------------------------------------------}
 
@@ -204,7 +207,7 @@ data Option s = forall a. Option
   { _oName        :: OptionName
   , _oDescription :: Text
   , _oArg         :: Arg a
-  , _oChange      :: a -> Change s }
+  , _oChange      :: a -> Changes s }
 makeLenses ''Option
 
 instance HasName        (Option s) where name        = oName
@@ -234,14 +237,11 @@ instance HasDescription AnyOption where
 
 -- | Apply an option-change to a RootCfg
 runAnyOption :: AnyOption -> Text -> Either ConfigurableException CfgChange
-runAnyOption (AnyOption l o) t = liftChange l <$> readOption o t
-
-
+runAnyOption (AnyOption l o) t = map (liftChange l) <$> readOption o t
 
 {- SECTION: Operations --------------------------------------------------------}
 
 {- SUBSECTION: ArgParse -------------------------------------------------------}
-
 
 -- | View anything that has an 'Arg' as an optparse-applicate 'ReadM'
 readM :: HasArg s a => Getter s (ReadM a)
@@ -258,17 +258,16 @@ readM = to $ eitherReader . f
 -- runOption = _oChange
 
 -- | Try to apply an option by parsing its arg from some text
-readOption :: Option s -> Text -> Either ConfigurableException (Change s)
+readOption :: Option s -> Text -> Either ConfigurableException (Changes s)
 readOption (Option n _ a c) t = maybe e (Right . c) . runArgParse a $ t
   where e = Left $ BadConfigurableValue n t (a^.argName)
 
-
 -- | Apply a change to some structure
-appChange :: Change s -> s -> s
-appChange = appEndo . view endo
+appChange :: Changes s -> s -> s
+appChange = appEndo . mconcat . toListOf (folded.endo)
 
 -- | Apply a change to some default value
-onDef :: Default s => Change s -> s
+onDef :: Default s => Changes s -> s
 onDef = (`appChange` def)
 
 {- SECTION: Values ------------------------------------------------------------}
@@ -296,7 +295,7 @@ msArg = fi <$> intArg
 -- | An argument that accepts a LogLevel string
 logLevelArg :: Arg LogLevel
 logLevelArg = Arg "log level" . parseMatch $
-  [ ("debug" , LevelDebug)
+  [ ("error" , LevelError)
   , ("warn"  , LevelWarn)
   , ("info"  , LevelInfo)
   , ("debug" , LevelDebug) ]
@@ -313,35 +312,49 @@ onOffArg :: Arg Bool
 onOffArg = Arg "on or off" . parseMatch $
   [("on", True) , ("off", False)]
 
+-- | Parse text as a simplecmd
+--
+-- Note that we don't yet support any of the delay or forking settings via the
+-- CLI. Those are currently only accessible via the config-file.
+cmdArg :: Arg Cmd
+cmdArg = simpleCmd <$> txtArg
+
 {- SUBSECTION: Overview -------------------------------------------------------}
 
+-- | All flags
 allFlags :: Named AnyFlag
 allFlags = mconcat
-  [ basicFlags, logFlags, localeFlags, inputFlags
+  [ rootFlags, logFlags, localeFlags, inputFlags, cmdsFlags
   , outputFlags, modelFlags, discoverFlags]
 
+-- | All options
 allOptions :: Named AnyOption
 allOptions = mconcat
-  [ basicOptions, logOptions, localeOptions, inputOptions
+  [ rootOptions, logOptions, localeOptions, inputOptions, cmdsOptions
   , outputOptions, modelOptions, discoverOptions]
+
+-- | All flags that apply regardless of task
+generalFlags :: Named AnyFlag
+generalFlags = mconcat
+  [ rootFlags, logFlags, cmdsFlags ]
+
+-- | All flags that apply regardless of task
+generalOptions :: Named AnyOption
+generalOptions = mconcat
+  [ rootOptions, logOptions, cmdsOptions ]
 
 {- SUBSECTION: RootCfg -------------------------------------------------------}
 
-basicFlags :: Named AnyFlag
-basicFlags = byName . map (AnyFlag id) $
+rootFlags :: Named AnyFlag
+rootFlags = byName . map (AnyFlag id) $
   [
-    mkFlag "safe-mode" cmdAllow False
-      "Turn of command-execution, same as `--commands off`"
   ]
 
-basicOptions :: Named AnyOption
-basicOptions = byName . map (AnyOption id) $
+rootOptions :: Named AnyOption
+rootOptions = byName . map (AnyOption id) $
   [
-    mkOption "config-file" cfgFile (Just <$> fileArg)
+    mkOption "cfg-file" cfgFile (Just <$> fileArg)
       "File containing kmonad's keymap configuration"
-
-  , mkOption "commands" cmdAllow onOffArg
-      "Whether KMonad is able to execute shell-commands"
   ]
 
 {- SUBSECTION: Logging --------------------------------------------------------}
@@ -372,7 +385,7 @@ localeFlags :: Named AnyFlag
 localeFlags = byName []
 
 localeOptions :: Named AnyOption
-localeOptions = byName . map (AnyOption localeCfg) $
+localeOptions = byName . map (AnyOption taskLocaleCfg) $
   [
     mkOption "key-table" keyTableCfg (CustomTable <$> fileArg)
       "File from which to load a tabular keytable"
@@ -382,6 +395,40 @@ localeOptions = byName . map (AnyOption localeCfg) $
 
   , mkOption "std-shift" stdShift txtArg
       "Keyname for key to use as shift in shifted-macros"
+  ]
+
+{- SUBSECTION: Cmds -----------------------------------------------------------}
+
+cmdsFlags :: Named AnyFlag
+cmdsFlags  = byName . map (AnyFlag cmdsCfg) $
+  [
+    mkFlag "safe" enabled False
+      "Run KMonad in 'safe' mode by disabling all shell-commands, same as 'commands off'"
+  ]
+
+cmdsOptions :: Named AnyOption
+cmdsOptions = byName . map (AnyOption cmdsCfg) $
+  [
+    mkOption "commands" enabled onOffArg
+      "Whether KMonad is able to execute shell-commands"
+
+  , mkOption "cmd-on-start" (hooks.at OnStart) (Just <$> cmdArg)
+      "Command to execute right after startup"
+
+  , mkOption "cmd-pre-acquire" (hooks.at PreAcquire) (Just <$> cmdArg)
+      "Command to execute right before acquiring key IO"
+
+  , mkOption "cmd-post-acquire" (hooks.at PostAcquire) (Just <$> cmdArg)
+      "Command to execute right after acquiring key IO"
+
+  , mkOption "cmd-pre-release" (hooks.at PreRelease) (Just <$> cmdArg)
+      "Command to execute right before releasing key IO"
+
+  , mkOption "cmd-post-release" (hooks.at PostRelease) (Just <$> cmdArg)
+      "Command to execute right after releasing key IO"
+
+  , mkOption "cmd-on-exit" (hooks.at OnExit) (Just <$> cmdArg)
+      "Command to execute right before shutdown"
   ]
 
 {- SUBSECTION: ModelCfg -------------------------------------------------------}

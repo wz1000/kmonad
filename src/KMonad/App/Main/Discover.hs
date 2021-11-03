@@ -5,15 +5,18 @@ module KMonad.App.Main.Discover where
 
 import KMonad.Prelude
 
+import KMonad.App.IO
+import KMonad.App.CfgFile
+import KMonad.App.Cmds
 import KMonad.App.Locale
 import KMonad.App.Logging
 import KMonad.App.Types
 
+import KMonad.Util.Ctx
 
 import System.Keyboard
 import System.Keyboard.IO
 
-import qualified RIO.Text as T
 import Text.RawString.QQ
 
 
@@ -54,74 +57,111 @@ terminal its running in with your mouse, or unplugging the keyboard.
 Waiting for you to press a key:
 |]
 
-{- NOTE: types ----------------------------------------------------------------}
+{- SECTION: types -------------------------------------------------------------}
 
 data DiscoverEnv = DiscoverEnv
-  { _deLogEnv    :: LogEnv    -- ^ The logging environment
-  , _deLocaleEnv :: LocaleEnv -- ^ The locale environment
-  , _deKeyI      :: KeyI      -- ^ The key-input environment
-  , _deKeyTable  :: KeyTable  -- ^ The keycode table
+  { _deDiscoverCfg :: DiscoverCfg -- ^ The configuration passed to discover
+  , _deRootEnv     :: RootEnv     -- ^ Copy of the containing RootEnv
+  , _deLocaleEnv   :: LocaleEnv   -- ^ The locale environment
+  , _deKeyI        :: KeyI        -- ^ The key-input environment
   }
 makeClassy ''DiscoverEnv
 
-instance HasLogEnv   DiscoverEnv where logEnv   = deLogEnv
-instance HasKeyI     DiscoverEnv where keyI     = deKeyI
-instance HasKeyTable DiscoverEnv where keyTable = deKeyTable
+instance HasDiscoverCfg DiscoverEnv where discoverCfg = deDiscoverCfg
+instance HasRootEnv     DiscoverEnv where rootEnv     = deRootEnv
+instance HasLogEnv      DiscoverEnv where logEnv      = rootEnv.logEnv
+instance HasLocaleEnv   DiscoverEnv where localeEnv   = deLocaleEnv
+instance HasKeyI        DiscoverEnv where keyI        = deKeyI
 
 type D a = RIO DiscoverEnv a
 
-{- SECTION: Exception ---------------------------------------------------------}
+{- SECTION: io ----------------------------------------------------------------}
 
-data DiscoverException = NoEscapeCode KeyTable
-  deriving Show
+withDiscover :: (CanRoot m env)
+  => (DiscoverEnv -> m a) -> m a
+withDiscover = runCtx $ ctxDiscover
 
-instance Exception DiscoverException where
-  -- NOTE: I'd like to print the currently loaded table, but first we need a
-  -- table-to-text export function.
-  displayException (NoEscapeCode _) = concat
-    [ "Could not find a keycode for 'esc' in the current table. Either "
-    , "add a keycode for escape to your table, or pass the `--inescapable` "
-    , "to the discover invocation."
-    ]
+-- | Grab the config from the reader monad
+--
+-- This throws an awful 'error' that should be unreachable. The *only* way it
+-- can be triggered is if we call 'ctxCfg' when we are *not* running a Task.
+-- Full blown programmer error, shamefur dispray.
+ctxCfg :: (CanRoot m env) => Ctx r m DiscoverCfg
+ctxCfg = lift $ preview (rootEnv.task._Discover) >>= \case
+    Nothing -> error "programmer error"
+    Just c_ -> pure c_
 
-{- SECTION: io -------------------------------------------------------------------}
+-- | Open all the contexts required to run discover
+ctxDiscover :: (CanRoot m env)
+  => Ctx r m DiscoverEnv
+ctxDiscover = do
+  -- Extract the config from the reader to see if we should check othe config
+  -- file, then do it again after updating the reader with the contents of the
+  -- cfg. We must do this twice because 'discover' supports the option of not
+  -- reading the config-file.
+  c <- ctxCfg
+  ctxLocal cfgFile $ if c^.checkConfig then id else const Nothing
+  ctxLoadedCfg
+  c <- ctxCfg
 
-runDiscover :: CanRoot m env => DiscoverCfg -> m ()
-runDiscover cfg = if cfg^.dumpKeyTable then atError $ log tableEnUSText else do
+  locenv <- ctxLocale $ c^.discoverCfg.localeCfg
 
-  logenv <- view logEnv
-  keytbl <- view keyTable
-  esc    <- view $ codeForName "esc"
+  ctxBracket (triggerHook PreAcquire) (triggerHook PostRelease)
+  ki <- ctxFromWith withKeyI $ c^.inputCfg
+  ctxBracket (triggerHook PostAcquire) (triggerHook PreRelease)
 
-  -- Set up a function to check if a keycode is equal to escape
-  isDone <- case (cfg^.escapeExits, esc) of
-    (False, _)     -> pure $ const False
-    (True, Just c) -> pure $ \s -> (c ==) . (view keycode) $ (s :: KeySwitch)
-    _              -> throwIO (NoEscapeCode keytbl)
+  mkCtx $ \f -> do
+    rootenv <- view rootEnv
+    f $ DiscoverEnv
+      { _deDiscoverCfg = c^.discoverCfg
+      , _deRootEnv     = rootenv
+      , _deLocaleEnv   = locenv
+      , _deKeyI        = ki }
 
-  withKeyI (cfg^.inputCfg) $ \ki -> do
-    let dscenv = DiscoverEnv
-                   { _deLogEnv    = logenv
-                   , _deKeyI      = ki
-                   , _deLocaleEnv = locenv
-                   }
-    runRIO dscenv $ do
+-- | Open the context and start the listener
+runDiscover :: (CanRoot m env) => m ()
+runDiscover = withDiscover . inEnv $ do
+  cfg <- view discoverCfg
+  if cfg^.dumpKeyTable then atError $ log tableEnUSText else do
 
-      atInfo $ sep >> log greeting
-      let step = do k <- getKey
-                    discoverReport k
-                    unless (isDone k) step
-      step
+    atWarn $ sep >> log greeting
 
+    esc <- getRequiredCode "esc"
+    let isDone e = (cfg^.escapeExits) && (e^.keycode == esc)
+    let step = do k <- getKey
+                  discoverReport k
+                  unless (isDone k) step
 
+    step
+
+-- | Print some information about a KeySwitch
 discoverReport :: KeySwitch -> D ()
 discoverReport s = atError $ do
   sep
   log $ "Type:    " <> tshow (s^.switch)
   log $ "Keycode: " <> tshow (s^.keycode)
 
-  view (namesForCode s) >>= \case
+  view (localeEnv.congruencesForCode s) >>= \case
     []  -> log "We have no names on file for this key."
     [k] -> dsp k
     ks  -> do log "We have multiple names on file for this key: "
               mapM_ dsp ks
+
+{- NOTE: Why Ctx is handy. Here is withDiscover without Ctx
+-- | Open all the contexts required to run discover
+withDiscover :: (CanRoot m env, HasDiscoverCfg c)
+  => c -> (DiscoverEnv -> m a) -> m a
+withDiscover c f = do
+  locally cfgFile (if c^.checkConfig then id else const Nothing) $
+    withLoadedCfg $
+      withLocale (c^.discoverCfg.localeCfg) $ \locenv ->
+        bracket_ (triggerHook PreAcquire) (triggerHook PostRelease) $
+          withKeyI (c^.discoverCfg.inputCfg) $ \ki ->
+            bracket_ (triggerHook PostAcquire) (triggerHook PreRelease) $ do
+              rootenv <- view rootEnv
+              f $ DiscoverEnv
+                    { _deDiscoverCfg = c^.discoverCfg
+                    , _deRootEnv     = rootenv
+                    , _deLocaleEnv   = locenv
+                    , _deKeyI        = ki }
+-}

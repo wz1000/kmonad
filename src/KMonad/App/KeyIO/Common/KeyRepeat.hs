@@ -85,7 +85,7 @@ repKey c = do
 -- it could be reinforced in the types or in the code.
 handlePress :: Keycode -> R ()
 handlePress c = overProc $ \x -> do
-  maybe (pure ()) (cancel . snd) x
+  maybe nil (cancel . snd) x
   a <- async $ repKey c
   pure $ Just (c, a)
 

@@ -63,22 +63,22 @@ pConcat ps = mconcat <$> sequenceA ps
 
 -- | Parse the top-level change to the default RootCfg passed on the cmd-line
 invocationP :: P
-invocationP = pConcat [ rootCfgP, taskP ]
+invocationP = pConcat [generalCfgP, taskP ]
 
 -- | Parse the task as a subcommand
 taskP :: P
 taskP = hsubparser $ mconcat
   [ mkOne "run" "Run a keyboard remapping."
-      (Run def) [modelCfgP, inputCfgP, outputCfgP]
+      (Run def) [modelCfgP, inputCfgP, outputCfgP, localeCfgP]
   , mkOne "discover" "Interactively explore button keycodes and names."
-      (Discover def) [inputCfgP, discoverCfgP]
+      (Discover def) [inputCfgP, discoverCfgP, localeCfgP]
   , mkOne "parse-test" "Check a config-file for errors."
       ParseTest []
   ]
   where
     mkOne :: Name -> Description -> Task -> [P] -> (Mod CommandFields CfgChange)
     mkOne n d t ps =
-      let p_  = pConcat $ ps <> [rootCfgP] <> [pure tsk]
+      let p_  = pConcat $ ps <> [generalCfgP] <> [pure tsk]
           -- ^ Concat all parsers into 1, *order is important*
           tsk = mkChange ("task:" <> n) (\c -> c & task .~ t)
           -- ^ Create a task for the provided settings
@@ -97,9 +97,10 @@ mkCfg fs os = pConcat $ (map fromFlag   . M.elems $ fs)
 -- currently only used by the 'Run' task, but I anticipate a few more tasks that
 -- might/will need access to these settings. So the seperation has been made for
 -- clarify of context and in preparation for these developments.
-rootCfgP, modelCfgP, inputCfgP, outputCfgP, discoverCfgP :: P
-rootCfgP    = mkCfg basicFlags    basicOptions
+generalCfgP, modelCfgP, inputCfgP, outputCfgP, discoverCfgP, localeCfgP :: P
+generalCfgP = mkCfg generalFlags generalOptions
 modelCfgP    = mkCfg modelFlags    modelOptions
+localeCfgP   = mkCfg localeFlags   localeOptions
 inputCfgP    = mkCfg inputFlags    inputOptions
 outputCfgP   = mkCfg outputFlags   outputOptions
 discoverCfgP = mkCfg discoverFlags discoverOptions

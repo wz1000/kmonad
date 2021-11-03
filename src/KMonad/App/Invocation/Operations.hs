@@ -3,9 +3,12 @@ module KMonad.App.Invocation.Operations
 where
 
 import KMonad.Prelude
-import KMonad.App.Parser.Types
+import KMonad.App.Configurable
+import KMonad.App.Invocation
+import KMonad.App.Types
 
-joinCLI = undefined
+
+-- joinCLI = undefined
 
 -- | Join the options given from the command line with the one read from the
 -- configuration file.

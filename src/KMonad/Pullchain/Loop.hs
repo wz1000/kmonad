@@ -30,14 +30,14 @@ handlePress :: HasCode a => a -> K ()
 handlePress c = view keymap >>= flip Km.lookupKey (c^.code) >>= \case
   Nothing -> view fallThrough >>= \b -> when b $ justEmit (c^.code)
   Just b  -> runBEnv b Press >>= \case
-    Nothing -> pure () -- If button was already pressed
+    Nothing -> nil -- If button was already pressed
     Just a  -> do
       env <- view modelEnv
       runRIO (KEnv env b) $ do
         runAction a
         awaitMy Release $ do
           runBEnv b Release >>= \case
-            Nothing -> pure ()
+            Nothing -> nil
             Just a  -> runAction a
           pure Catch
 

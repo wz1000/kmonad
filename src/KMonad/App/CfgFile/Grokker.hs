@@ -1,16 +1,16 @@
 -- |
 
-module KMonad.App.Parser.Grokker where
+module KMonad.App.CfgFile.Grokker where
 
 import KMonad.Prelude
 
 import KMonad.App.Configurable
-import KMonad.App.Parser.Tokenizer
+import KMonad.App.CfgFile.Tokenizer
 import KMonad.App.Types
 import KMonad.Util.Name
 
 import System.Keyboard -- FIXME: delete when done
-import KMonad.App.Parser.Test -- FIXME: Remove when done
+-- import KMonad.App.Parser.Test -- FIXME: Remove when done
 
 
 {- NOTE: ordering --------------------------------------------------------------
@@ -26,9 +26,9 @@ ERGO: We need grokking to be a 2 phase process:
 
 {- SECTION: errors ------------------------------------------------------------}
 
-data GrokException
-  = NoGrokConfigurable ConfigurableException
-  deriving (Eq, Show)
+-- data GrokException
+--   = NoGrokConfigurable ConfigurableException
+--   deriving (Eq, Show)
 
 {- SECTION: extract configureables --------------------------------------------}
 
@@ -51,12 +51,12 @@ grokOption (o, t) = case allOptions ^. at o of
   Nothing -> Left $ UnknownConfigurable o
   Just o_ -> runAnyOption o_ t
 
+grok :: KTokens -> Either ConfigurableException CfgChange
+grok = grokSettings
 
-gfull :: OnlyIO ()
-gfull = do
-  tk <- prs ktokens myCfg
-  case grokSettings tk of
-    Left e -> throwIO e
-    Right a -> pp $ a^.changes
-
-
+-- gfull :: OnlyIO ()
+-- gfull = do
+--   tk <- prs ktokens myCfg
+--   case grokSettings tk of
+--     Left e -> throwIO e
+--     Right a -> ppIO $ a^..folded.description

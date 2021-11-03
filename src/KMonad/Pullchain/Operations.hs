@@ -80,18 +80,18 @@ b (BStickyKey ms p) = stickyKey ms (b p)
 --           await (isReleaseOf c) $ \_ -> do
 --             emit $ mkRelease c
 --             pure Catch
---         else pure ()
+--         else nil
 
 --     -- If the keycode does occur in our keymap
 --     Just b  -> runBEnv b Press >>= \case
---       Nothing -> pure ()  -- If the previous action on this key was *not* a release
+--       Nothing -> nil  -- If the previous action on this key was *not* a release
 --       Just a  -> do
 --         -- Execute the press and register the release
 --         app <- view appEnv
 --         runRIO (KEnv app b) $ do
 --           runAction a
 --           awaitMy Release $ do
---             runBEnv b Release >>= maybe (pure ()) runAction
+--             runBEnv b Release >>= maybe nil runAction
 --             pure Catch
 
 --------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ b (BStickyKey ms p) = stickyKey ms (b p)
 -- loop :: RIO AppEnv ()
 -- loop = forever $ view sluice >>= Sl.pull >>= \case
 --   e | e^.switch == Press -> pressKey $ e^.code
---   _                      -> pure ()
+--   _                      -> nil
 
   -- Initialize output components
   -- ohk <- Hs.mkHooks . atomically . takeTMVar $ otv

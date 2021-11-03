@@ -64,7 +64,7 @@ dspDebug = logDebug . textDisplay
 -- | Utility functio nto create the other seperator functions
 doSep :: (LIO m e) => (Text -> m ()) -> m ()
 doSep f = view (logEnv.logCfg.logSep) >>= \case
-  (LogSep Nothing)  -> pure ()
+  (LogSep Nothing)  -> nil
   (LogSep (Just t)) -> f t
 
 -- | Functions to write separators to the log.

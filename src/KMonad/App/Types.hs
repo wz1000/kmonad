@@ -1,4 +1,5 @@
 -- FIXME: Move the CPP somewhere else
+
 {-# LANGUAGE CPP #-}
 module KMonad.App.Types
   -- ( AppCfg(..)
@@ -12,6 +13,7 @@ where
 import KMonad.Prelude
 
 import KMonad.Util.Time
+import KMonad.App.Cmds
 import KMonad.App.Locale
 import KMonad.App.Logging
 
@@ -21,6 +23,7 @@ import UnliftIO.Directory
 import qualified RIO.Text as T
 import RIO.FilePath
 
+import System.IO (putStrLn)
 
 
 
@@ -67,21 +70,19 @@ instance Default ModelCfg where def = ModelCfg True 10
 data RunCfg = RunCfg
   { _rModelCfg  :: ModelCfg  -- ^ Cfg how the model is run
   , _rInputCfg  :: InputCfg  -- ^ Cfg how to grab input
+  , _rLocaleCfg :: LocaleCfg -- ^ Cfg how to relate keynames and keycodes
   , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
   } deriving (Eq, Show)
 makeClassy ''RunCfg
 
-instance Default RunCfg where def = RunCfg def def def
+instance Default RunCfg where def = RunCfg def def def def
 
 instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
 instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
+instance HasLocaleCfg RunCfg where localeCfg = rLocaleCfg
 instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 
 -- | Config describing how to run @kmonad discover@
---
--- To do this we need to:
--- 1. Grab KeyI
--- 2. Maybe parse a config file (to get at KeyI)
 data DiscoverCfg = DiscoverCfg
   { _dInputCfg    :: InputCfg  -- ^ Config how to grab input
   , _dLocaleCfg   :: LocaleCfg -- ^ Config describing keyname/keycode correspondences
@@ -112,6 +113,8 @@ instance Default Task where def = Run def
 class HasTask a where task :: Lens' a Task
 instance HasTask Task where task = id
 
+-- TODO: Generalize the next few traversals
+
 -- | A traversal over an 'InputCfg' stored in a 'Task'
 --
 -- i.e. How to get at maybe an InputCfg in a Task
@@ -130,53 +133,41 @@ taskOutputCfg = task._Run.outputCfg
 taskModelCfg :: HasTask s => Traversal' s ModelCfg
 taskModelCfg = task._Run.modelCfg
 
+-- | A traversal over a 'LocaleCfg' stored in a 'Task'
+--
+-- i.e. How to get at maybe an InputCfg in a Task
+taskLocaleCfg :: HasTask s => Traversal' s LocaleCfg
+taskLocaleCfg f s = case s^.task of
+  ParseTest  -> pure s
+  Run c      -> (\lc -> s & task._Run.localeCfg .~ lc)      <$> (f $ c^.localeCfg)
+  Discover c -> (\lc -> s & task._Discover.localeCfg .~ lc) <$> (f $ c^.localeCfg)
+{- ^NOTE: This one was difficult because both Run and Discover have an InputCfg -}
 
 {- SECTION: basic cfg ---------------------------------------------------------}
 
 -- | Configuration options that are required for everything in KMonad
 data RootCfg = RootCfg
-  { _rLogCfg     :: LogCfg
-  , _bcTask      :: Task           -- ^ The instruction passed to KMonad
-  , _cmdAllow    :: Bool           -- ^ Whether to allow KMonad to call shell commands
-  , _cfgFile     :: Maybe FilePath -- ^ Where to look for a config file
+  { _rLogCfg  :: LogCfg         -- ^ Logging cfg
+  , _rCmdsCfg :: CmdsCfg        -- ^ Hooks and commands cfg
+  , _bcTask   :: Task           -- ^ The instruction passed to KMonad
+  , _cmdAllow :: Bool           -- ^ Whether to allow KMonad to call shell commands
+  , _cfgFile  :: Maybe FilePath -- ^ Where to look for a config file
   } deriving (Eq, Show)
 makeClassy ''RootCfg
 
-instance HasLogCfg    RootCfg where logCfg    = rLogCfg
-
 instance Default RootCfg where
   def = RootCfg
-    { _rLogCfg     = def
-    , _bcTask      = def
-    , _cmdAllow    = False
-    , _cfgFile     = Nothing
+    { _rLogCfg  = def
+    , _rCmdsCfg = def
+    , _bcTask   = def
+    , _cmdAllow = False
+    , _cfgFile  = Nothing
     }
 
--- | The first runtime environment available to all of KMonad
-data RootEnv = RootEnv
-  { _geRootCfg   :: RootCfg
-  , _geLogEnv    :: LogEnv
-  }
-makeClassy ''RootEnv
-
-instance HasRootCfg   RootEnv where rootCfg   = geRootCfg
-instance HasLogEnv    RootEnv where logEnv    = geLogEnv
-
-type CanRoot m env = ( EnvUIO m env, HasLogEnv env, HasRootEnv env
-                     , HasRootCfg env )
-
+instance HasLogCfg  RootCfg where logCfg  = rLogCfg
+instance HasCmdsCfg RootCfg where cmdsCfg = rCmdsCfg
 instance HasTask RootCfg where task = bcTask
 
--- | Run a function that requires a 'RootEnv' using a 'RootCfg'
-runRoot :: (UIO m, HasRootCfg c) => c -> (RootEnv -> m a) -> m a
-runRoot c f = withLog (c^.rootCfg.logCfg) $ f . RootEnv (c^.rootCfg)
-
-
-{- NOTE: What are the *actual* contexts I need
-base    -> we start here. Nothing is initialized, and we check the invocation.
-invoked -> we have the settings passed to Invoc, including the config file.
-...
--}
 
 
 --------------------------------------------------------------------------------

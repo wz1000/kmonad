@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-|
 Module      : KMonad.Util.LayerStack
 Description : A container of overlapping mappings

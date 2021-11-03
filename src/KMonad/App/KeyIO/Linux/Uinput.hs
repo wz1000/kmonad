@@ -150,7 +150,7 @@ withUinput cfg = mkCtx $ \f -> do
         u <- askRunInIO
         rep <- case cfg^.mayRepeatCfg of
           Just repCfg -> mkRepeatEnv repCfg $ u . runRIO env . sendEvent LinuxRepeat
-          Nothing     -> mkRepeatEnv def    $ const $ pure ()
+          Nothing     -> mkRepeatEnv def    $ const $ nil
 
         -- Insert key-repeater into env to deliver fully packaged environment
         pure $ env { _repEnv = rep }

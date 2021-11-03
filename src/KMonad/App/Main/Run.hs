@@ -4,6 +4,7 @@ where
 
 import KMonad.Prelude
 import KMonad.App.Logging
+import KMonad.App.IO
 import KMonad.App.Types
 
 runRun :: CanRoot m env => RunCfg -> m ()

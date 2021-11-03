@@ -15,6 +15,7 @@ import Control.Lens as X hiding
 import Control.Monad.Cont      as X
 import Data.Default            as X
 import RIO.Text                as X (unlines, lines, unpack, pack)
+import RIO.FilePath            as X ((</>))
 import Text.Pretty.Simple      as X (pShow)
 
 import RIO as X hiding

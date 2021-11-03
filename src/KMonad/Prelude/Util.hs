@@ -9,8 +9,11 @@ module KMonad.Prelude.Util
   , duplicates
 
   , untilJust
+  , ifM
 
+  , nil
   , uncurry3
+  , singleton
   )
 where
 
@@ -24,6 +27,7 @@ import qualified RIO.Set     as S
 
 --------------------------------------------------------------------------------
 -- $uncategorized
+
 
 -- | undefined is too long to type when debugging
 u :: a
@@ -69,7 +73,22 @@ untilJust go = go >>= \case
   Nothing -> untilJust go
   Just a  -> pure a
 
+-- | Choose a branch based on the result of some monadic bool
+ifM :: Monad m
+  => m Bool -- ^ Test to run
+  -> m a    -- ^ Branch on False
+  -> m a    -- ^ Branch on True
+  -> m a    -- ^ result
+ifM mb a b = mb >>= bool a b
+
 --------------------------------------------------------------------------------
+
+-- Used so often it warrants a shorthand
+nil :: Applicative m => m ()
+nil = pure ()
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (a, b, c) = f a b c
+
+singleton :: a -> [a]
+singleton = (:[])

@@ -67,20 +67,22 @@ instance Default KeyTable where def = tableEnUS
 ks :: HasKeyTable a => Getter a [KeyCongruence]
 ks = keyTable . uKeyTable
 
+
+
 -- | Lookup a Keycode for a particular OS in a KeyTable
 --
 -- Note that there may be 0, 1, or multiple entries for a given (OS, Keycode)
 -- tuple, since it is possible to bind many names to the same key.
-namesForCodeForOS :: (HasKeyTable a, HasKeycode c)
+congruencesForCodeForOS :: (HasKeyTable a, HasKeycode c)
   => OS -> c -> Getter a [KeyCongruence]
-namesForCodeForOS os c = to $ \a -> case os of
+congruencesForCodeForOS os c = to $ \a -> case os of
   Linux   -> a^..ks.folded.filtered (\k -> k^.keyLin == Just (c^.keycode.from _Keycode))
   Mac     -> a^..ks.folded.filtered (\k -> k^.keyMac == Just (c^.keycode.from _Keycode))
   Windows -> a^..ks.folded.filtered (\k -> k^.keyMac == Just (c^.keycode.from _Keycode))
 
 -- | Lookup a 'Keycode' for your current OS in a KeyTable
-namesForCode :: (HasKeycode c, HasKeyTable a) => c -> Getter a [KeyCongruence]
-namesForCode = namesForCodeForOS currentOS
+congruencesForCode :: (HasKeycode c, HasKeyTable a) => c -> Getter a [KeyCongruence]
+congruencesForCode = congruencesForCodeForOS currentOS
 
 -- | Look up the KeyDict for a specific OS
 keyDictForOS :: HasKeyTable a => OS -> Getter a KeyDict

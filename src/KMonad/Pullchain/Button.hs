@@ -81,10 +81,10 @@ mkButton a b = Button (Action a) (Action b)
 
 -- | Create a new button with only a 'Press' action
 onPress :: AnyK () -> Button
-onPress p = mkButton p $ pure ()
+onPress p = mkButton p $ nil
 
 onRelease :: AnyK () -> Button
-onRelease = mkButton (pure ())
+onRelease = mkButton nil
 
 --------------------------------------------------------------------------------
 -- $running
@@ -149,7 +149,7 @@ layerRem t = onPress (layerOp $ PopLayer t)
 
 -- | Create a button that does nothing (but captures the input)
 pass :: Button
-pass = onPress $ pure ()
+pass = onPress $ nil
 
 doPause :: Ms -> Button
 doPause ms = onPress (pause ms)
@@ -157,7 +157,7 @@ doPause ms = onPress (pause ms)
 -- | Create a button that executes a shell command on press and possibly on
 -- release
 cmdButton :: Text -> Maybe Text -> Button
-cmdButton pr mbR = mkButton (shellCmd pr) (maybe (pure ()) shellCmd mbR)
+cmdButton pr mbR = mkButton (shellCmd pr) (maybe nil shellCmd mbR)
 
 --------------------------------------------------------------------------------
 -- $combinators
@@ -229,8 +229,8 @@ tapOn ::
      Switch -- ^ Which 'Switch' should trigger the tap
   -> Button -- ^ The 'Button' to tap
   -> Button -- ^ The tapping 'Button'
-tapOn Press   b = mkButton (tap b)   (pure ())
-tapOn Release b = mkButton (pure ()) (tap b)
+tapOn Press   b = mkButton (tap b)   nil
+tapOn Release b = mkButton nil (tap b)
 
 -- | Create a 'Button' that performs a tap of one button if it is released
 -- within an interval. If the interval is exceeded, press the other button (and
@@ -382,7 +382,7 @@ multiTap l bs = onPress $ go bs
 tapMacro :: [Button] -> Button
 tapMacro bs = onPress $ go bs
   where
-    go []      = pure ()
+    go []      = nil
     go (b:[])  = press b
     go (b:rst) = tap b >> go rst
 
@@ -391,7 +391,7 @@ tapMacro bs = onPress $ go bs
 tapMacroRelease :: [Button] -> Button
 tapMacroRelease bs = onPress $ go bs
   where
-    go []      = pure ()
+    go []      = nil
     go (b:[])  = awaitMy Release $ tap b >> pure Catch
     go (b:rst) = tap b >> go rst
 
@@ -433,7 +433,7 @@ stickyKey ms b = onPress $ go
   doTap =
     within ms
            (pure isPress)  -- presses definitely happen after us
-           (pure ())
+           nil
            (\t -> (runAction $ b^.pressAction)
                *> inject (t^.event)
                *> after 3 (runAction $ b^.releaseAction)

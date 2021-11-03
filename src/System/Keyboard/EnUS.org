@@ -1,18 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
--- |
-
-module System.Keyboard.EnUS where
-
-import System.Keyboard.Prelude
-
-import Text.RawString.QQ
-import qualified RIO.Text as T
-
--- | org-mode table representation of the enUS table.
---
--- TODO: This could probably be TH, right?
-tableEnUSText :: Text
-tableEnUSText = T.drop 1 $ [r|
 | core name | shifted | linux |         mac | windows | description                |
 |-----------+---------+-------+-------------+---------+----------------------------|
 | q         | Q       |  0x10 | 0x700000014 |    0x51 | letter Q                   |
@@ -56,11 +41,10 @@ tableEnUSText = T.drop 1 $ [r|
 | cmps      |         |  0x7f | 0x700000065 |    0x5D | Key left of rctl           |
 | lsft      |         |  0x2A | 0x7000000E1 |    0xA0 | Left shift                 |
 | lctl      |         |  0x1D | 0x7000000E0 |    0xA2 | Left Control               |
-| lmet      |         |  0x7D | 0x7000000E3 |    0x5B | Left Windows/Cmd/Meta      |
-| lalt      |         |  0x38 | 0x7000000E2 |    0xA4 | Left Alt/Option            |
-| rsft      |         |  0x36 | 0x7000000E5 |    0xA1 | Right Shift                |
-| rctl      |         |  0x61 | 0x7000000E4 |    0xA3 | Right Control              |
-| rmet      |         |  0x7E | 0x7000000E7 |    0x5C | Right Windows/Cmd/Meta     |
+| lmet      |         |  0x7D | 0x700000xE3 |    0x5B | Left Windows/Cmd/Meta      |
+| lalt      |         |  0x38 | 0x700000xE2 |    0xA4 | Left Alt/Option            |
+| rsft      |         |  0x36 | 0x700000xE5 |    0xA1 | Right Shift                |
+| rctl      |         |  0x61 | 0x700000xE4 |    0xA3 | Right Control              |
+| rmet      |         |  0x7E | 0x700000xE7 |    0x5C | Right Windows/Cmd/Meta     |
 | ralt      |         |  0x64 | 0x7000000E6 |    0xA5 | Right alt                  |
 | fn        |         |       | 0x700000003 |         | Mac Fn                     |
-|]

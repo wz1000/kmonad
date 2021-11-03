@@ -24,6 +24,7 @@ import Foreign.Storable
 import GHC.Enum (Enum(..))
 
 import qualified RIO.HashMap as M
+import qualified RIO.Text    as T
 
 {- NOTE: Basic -}
 
@@ -434,15 +435,17 @@ data KeyCongruence = KeyCongruence
   } deriving (Eq, Show)
 makeLenses ''KeyCongruence
 
+
 instance Display KeyCongruence where
   textDisplay k = mconcat
-    [ k^.keyName, " "
-    , maybe "~~" tshow (k^.shiftedName)          , " "
-    , maybe "~~" tshow (k^?keyLin._Just._Keycode), " "
-    , maybe "~~" tshow (k^?keyMac._Just._Keycode), " "
-    , maybe "~~" tshow (k^?keyWin._Just._Keycode), " "
+    [ pad $ k^.keyName, " "
+    , pad $ fromMaybe "~~" (k^.shiftedName)            , " "
+    , pad $ maybe "~~" tshow (k^?keyLin._Just._Keycode), " "
+    , pad $ maybe "~~" tshow (k^?keyMac._Just._Keycode), " "
+    , pad $ maybe "~~" tshow (k^?keyWin._Just._Keycode), " "
     , "(", k^.keyDescription, ")"
     ]
+    where pad = T.justifyLeft 10 ' '
 
 -- | A table of keyname to keycode mappings across OSes
 newtype KeyTable = KeyTable { _uKeyTable :: [KeyCongruence] }

@@ -36,5 +36,5 @@ onErr :: (MonadUnliftIO m)
   -> (Int -> m ())
   -> m ()
 onErr a f = a >>= \case
-  FFISuccess   -> pure ()
+  FFISuccess   -> nil
   FFIFailure n -> f n

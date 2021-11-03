@@ -36,9 +36,9 @@ withOS = mkCtx $ \f -> do
 #endif
 
 #ifdef darwin_HOST_OS
-withOS = pure ()
+withOS = nil
 #endif
 
 #ifdef mingw32_HOST_OS
-withOS = pure ()
+withOS = nil
 #endif

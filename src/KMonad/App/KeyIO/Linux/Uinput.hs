@@ -2,7 +2,7 @@ module KMonad.App.KeyIO.Linux.Uinput
   ( withUinput )
 where
 
-import KMonad.Prelude
+import Preface
 
 -- FIXME: Cleanup old code, then reorganize imports
 import KMonad.Util.Ctx

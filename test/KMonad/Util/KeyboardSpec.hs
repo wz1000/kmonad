@@ -1,7 +1,7 @@
 module KMonad.Util.KeyboardSpec ( spec ) where
 
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Keyboard
 
 import Test.Hspec

@@ -18,7 +18,7 @@ module KMonad.Util.Keyboard.Mac
 where
 
 
-import KMonad.Prelude
+import Preface
 
 import Numeric (showHex)
 import Data.Char (toUpper)

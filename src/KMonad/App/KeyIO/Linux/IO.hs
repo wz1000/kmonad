@@ -4,7 +4,7 @@ module KMonad.App.KeyIO.Linux.IO
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 import KMonad.Util.OS
 

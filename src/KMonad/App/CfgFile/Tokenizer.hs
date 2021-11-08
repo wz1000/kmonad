@@ -3,7 +3,7 @@
 module KMonad.App.CfgFile.Tokenizer where
 
 
-import KMonad.Prelude hiding (try)
+import Preface hiding (try)
 
 import KMonad.App.Configurable
 import KMonad.Util.Name

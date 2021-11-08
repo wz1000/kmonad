@@ -16,7 +16,7 @@ module KMonad.Util.Keyboard.Windows
 where
 
 import Foreign.Storable
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Keyboard.Common
 import KMonad.Util.Keyboard.Keynames
 import qualified RIO.HashMap as M

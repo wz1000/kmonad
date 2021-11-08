@@ -19,7 +19,7 @@ module KMonad.Util.Keyboard.Compose
   )
 where
 
-import KMonad.Prelude
+import Preface
 
 --------------------------------------------------------------------------------
 

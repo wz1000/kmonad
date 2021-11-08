@@ -1,7 +1,7 @@
 -- |
 module KMonad.App.KeyIO.Common.Types where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Keyboard
 import KMonad.Util.Name
 import KMonad.Util.Time

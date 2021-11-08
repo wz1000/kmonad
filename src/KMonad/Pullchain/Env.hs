@@ -8,7 +8,7 @@ module KMonad.Pullchain.Env
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 
 import KMonad.Model.Types

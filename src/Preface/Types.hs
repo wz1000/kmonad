@@ -1,20 +1,19 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 {- Additionaly types that should always be available -}
-module KMonad.Prelude.Types
+module Preface.Types
   ( Default(..)
-  , Pred
 
   -- * Shorthand
   , OnlyIO, IO, UIO, EnvIO, EnvUIO
   )
 where
 
-import KMonad.Prelude.Imports
+import Preface.Imports
 import qualified RIO as R
 
 --------------------------------------------------------------------------------
 
--- | A type for predicates
-type Pred a = a -> Bool
+instance Display Natural where textDisplay = tshow
 
 --------------------------------------------------------------------------------
 -- $shorthand

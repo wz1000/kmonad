@@ -2,7 +2,7 @@ module KMonad.Util.Keyboard.Operations
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Keyboard.Types
 import KMonad.Util.Keyboard.OS (keycodeNames)
 

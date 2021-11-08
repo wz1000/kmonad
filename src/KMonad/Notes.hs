@@ -2,7 +2,7 @@
 
 module Notes where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 
 -- import Data.Stream

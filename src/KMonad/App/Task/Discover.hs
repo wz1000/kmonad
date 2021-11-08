@@ -1,9 +1,9 @@
 {-# LANGUAGE QuasiQuotes #-}
 -- |
 
-module KMonad.App.Main.Discover where
+module KMonad.App.Task.Discover where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.App.IO
 import KMonad.App.CfgFile
@@ -63,7 +63,7 @@ data DiscoverEnv = DiscoverEnv
   { _deDiscoverCfg :: DiscoverCfg -- ^ The configuration passed to discover
   , _deRootEnv     :: RootEnv     -- ^ Copy of the containing RootEnv
   , _deLocaleEnv   :: LocaleEnv   -- ^ The locale environment
-  , _deKeyI        :: KeyI        -- ^ The key-input environment
+  , _deInputEnv        :: InputEnv        -- ^ The key-input environment
   }
 makeClassy ''DiscoverEnv
 
@@ -71,7 +71,7 @@ instance HasDiscoverCfg DiscoverEnv where discoverCfg = deDiscoverCfg
 instance HasRootEnv     DiscoverEnv where rootEnv     = deRootEnv
 instance HasLogEnv      DiscoverEnv where logEnv      = rootEnv.logEnv
 instance HasLocaleEnv   DiscoverEnv where localeEnv   = deLocaleEnv
-instance HasKeyI        DiscoverEnv where keyI        = deKeyI
+instance HasInputEnv        DiscoverEnv where keyI        = deInputEnv
 
 type D a = RIO DiscoverEnv a
 
@@ -107,7 +107,7 @@ ctxDiscover = do
   locenv <- ctxLocale $ c^.discoverCfg.localeCfg
 
   ctxBracket (triggerHook PreAcquire) (triggerHook PostRelease)
-  ki <- ctxFromWith withKeyI $ c^.inputCfg
+  ki <- ctxFromWith withInputEnv $ c^.inputCfg
   ctxBracket (triggerHook PostAcquire) (triggerHook PreRelease)
 
   mkCtx $ \f -> do
@@ -116,7 +116,7 @@ ctxDiscover = do
       { _deDiscoverCfg = c^.discoverCfg
       , _deRootEnv     = rootenv
       , _deLocaleEnv   = locenv
-      , _deKeyI        = ki }
+      , _deInputEnv        = ki }
 
 -- | Open the context and start the listener
 runDiscover :: (CanRoot m env) => m ()

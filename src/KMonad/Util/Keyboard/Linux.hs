@@ -20,7 +20,7 @@ module KMonad.Util.Keyboard.Linux
 where
 
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Util.Time
 import KMonad.Util.Name

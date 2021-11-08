@@ -33,7 +33,7 @@ module KMonad.Pullchain.Action
 
 where
 
-import KMonad.Prelude
+import Preface
 
 -- import KMonad.Keyboard
 import KMonad.Util

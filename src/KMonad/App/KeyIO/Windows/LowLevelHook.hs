@@ -12,7 +12,7 @@ module KMonad.App.KeyIO.Windows.LowLevelHook
   ( withLowLevelHook )
 where
 
-import KMonad.Prelude
+import Preface
 
 import Foreign.Marshal hiding (void)
 import Foreign.Ptr

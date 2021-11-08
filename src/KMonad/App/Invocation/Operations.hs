@@ -2,7 +2,7 @@ module KMonad.App.Invocation.Operations
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.App.Configurable
 import KMonad.App.Invocation
 import KMonad.App.Types

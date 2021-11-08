@@ -1,19 +1,12 @@
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-orphans #-} -- <- Because CanWithInput
 {-# LANGUAGE CPP #-}
 -- | TODO: Document me
 module System.Keyboard.IO.Evdev
-  ( -- * Basic types
-    EvdevCfg(..)
-  , HasEvdevCfg(..)
-  , EvdevEnv
-  , CanEvdev
-
-    -- * Exceptions
-  , EvdevException(..)
+  ( -- * Exceptions
+    EvdevException(..)
   , AsEvdevException(..)
 
     -- * API
-  , evdevReadLow
   , evdevRead
   , withEvdev
   )
@@ -38,7 +31,6 @@ import qualified Data.Serialize as B (decode)
 {- NOTE: types -----------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
-
 -- | The environment used to handle evdev operations
 data EvdevEnv = EvdevEnv
   { _cfg :: EvdevCfg -- ^ The 'EvdevCfg' with which this env was started
@@ -53,8 +45,6 @@ makeClassy ''EvdevEnv
 -- THIS BREAKS EVERYTHING AND SHOULD NOT BE DONE.
 
 instance HasEvdevCfg EvdevEnv where evdevCfg = cfg
-
-type CanEvdev m env = (MonadIO m, MonadReader env m, HasEvdevEnv env)
 
 {- NOTE: Exceptions ------------------------------------------------------------
 -------------------------------------------------------------------------------}
@@ -141,33 +131,18 @@ closeEvdev env = c_ioctl_keyboard (env^.fd) 0
 {- NOTE: API -------------------------------------------------------------------
 -------------------------------------------------------------------------------}
 
--- | Return the first 'LowLinEvent' from an open device file
-evdevReadLow :: CanEvdev m env => m LowLinEvent
-evdevReadLow = view evdevEnv >>= \env -> liftIO $ do
+-- | Read a linux-event from the device
+evdevRead :: RIO EvdevEnv LowLinEvent
+evdevRead = view evdevEnv >>= \env -> liftIO $ do
 
   bytes <- B.hGet (env^.h) 24
   case B.decode . B.reverse $ bytes of
     Left s            -> throwing _EvdevCouldNotDecode (env, s)
     Right (a,b,c,d,e) -> pure $ (LinPacket e d c b a)^.re _LinPacket
 
--- | Return the first key press or release from an open device file
-evdevRead :: CanEvdev m env => m KeySwitch
-evdevRead = evdevReadLow >>= \case
-  LowLinKeyEvent e -> pure $ mkKeySwitch (e^.switch) (e^.keycode)
-  _                -> evdevRead
-
 -- | Run some function in the context of an acquired evdev keyboard.
---
--- Use this if you want access to all of the events thrown by a linux keyboard
--- event file. Use 'withEvdev' if you want only key press and release events.
--- This context is a little bit less fleshed out than 'withEvdev', and you will
--- have to embed the environment and deal with the 'LowLinEvent's yourself.
-withEvdevEnv :: MonadUnliftIO m => EvdevCfg -> (EvdevEnv -> m a) -> m a
-withEvdevEnv cfg = bracket (liftIO $ openEvdev cfg) (liftIO . closeEvdev)
+withEvdev :: MonadUnliftIO m => EvdevCfg -> (IO LowLinEvent -> m a) -> m a
+withEvdev cfg f = bracket (liftIO $ openEvdev cfg) (liftIO . closeEvdev)
+  $ \env -> f (runRIO env evdevRead)
 
--- | Run some function in the context of an acquired device file
-withEvdev :: MonadUnliftIO m => EvdevCfg -> (BasicKeyI -> m a) -> m a
-withEvdev cfg f = withEvdevEnv cfg
-  $ \env -> f (BasicKeyI (runRIO env evdevRead))
-
-instance CanOpenBasicKeyI EvdevCfg where withBasicKeyI = withEvdev
+-- instance CanWithInput EvdevCfg LowLinEvent where withKeyInput = withEvdev

@@ -4,7 +4,7 @@ module KMonad.Util.Logging.Operations
   )
 where
 
-import KMonad.Prelude
+import Preface
 import qualified RIO.Text.Lazy as T (toStrict)
 import Text.Pretty.Simple (pShow, pShowNoColor)
 

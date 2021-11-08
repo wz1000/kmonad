@@ -2,7 +2,7 @@
 
 module Notes where
 
-import KMonad.Prelude
+import Preface
 
 type Ms = Int
 

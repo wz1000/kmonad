@@ -10,7 +10,7 @@ module KMonad.App.Types
   -- )
 where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Util.Time
 import KMonad.App.Cmds

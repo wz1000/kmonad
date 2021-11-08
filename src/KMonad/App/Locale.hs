@@ -2,7 +2,7 @@
 
 module KMonad.App.Locale where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Ctx
 
 import System.Keyboard

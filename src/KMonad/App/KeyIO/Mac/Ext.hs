@@ -4,7 +4,7 @@ module KMonad.App.KeyIO.Mac.Ext
   ( withExt )
 where
 
-import KMonad.Prelude
+import Preface
 
 import Foreign.Ptr
 import Foreign.Marshal hiding (void)

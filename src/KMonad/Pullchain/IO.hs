@@ -2,7 +2,7 @@ module KMonad.Pullchain.IO
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util hiding (around)
 import KMonad.App.Types
 import KMonad.Model

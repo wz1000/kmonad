@@ -1,21 +1,21 @@
 {-# LANGUAGE CPP #-}
 -- | TODO: Document me
 module System.Keyboard.IO.Uinput
-  ( -- * Basic types
-    UinputCfg(..)
-  , HasUinputCfg(..)
-  , UinputEnv
-  , CanUinput
+  -- ( -- * Basic types
+  --   UinputCfg(..)
+  -- , HasUinputCfg(..)
+  -- , UinputEnv
+  -- , CanUinput
 
-    -- * Exceptions
-  , UinputException(..)
-  , AsUinputException(..)
+  --   -- * Exceptions
+  -- , UinputException(..)
+  -- , AsUinputException(..)
 
-    -- * API
-  , uinputWriteLow
-  , uinputWrite
-  , uinputRepeat
-  )
+  --   -- * API
+  -- , uinputWriteLow
+  -- , uinputWrite
+  -- , uinputRepeat
+  -- )
 where
 
 import System.Keyboard.Prelude
@@ -34,21 +34,6 @@ import System.Posix
 The configuration and environment settings for a Uinput sink.
 -------------------------------------------------------------------------------}
 
--- | Configuration for uinput keysink in Linux
-data UinputCfg = UinputCfg
-  { _vendorCode     :: !Int  -- ^ USB vendor code of the generated keyboard
-  , _productCode    :: !Int  -- ^ USB product code of the generated keyboard
-  , _productVersion :: !Int  -- ^ USB product version
-  , _keyboardName   :: !Name -- ^ Name used to identify keyboard to OS
-  } deriving (Eq, Show)
-makeClassy ''UinputCfg
-
-instance Default UinputCfg where
-  def = UinputCfg
-    { _vendorCode     = 0xFFFF
-    , _productCode    = 0xFFFF
-    , _productVersion = 0x0000
-    , _keyboardName   = "Haskell simulated keyboard" }
 
 -- | The environment used to handle uinput operations
 data UinputEnv = UinputEnv
@@ -190,13 +175,13 @@ uinputRepeat c = do
   uinputWriteLow . LowLinRepeatEvent $ mkLinRepeatEvent (c^.re _Keycode)
   uinputWriteLow . LowLinSyncEvent   $ mkLinSyncEvent
 
--- | Run some function in the context of an open uinput device.
-withUinput :: MonadUnliftIO m => UinputCfg -> (BasicKeyO -> m a) -> m a
-withUinput cfg f =
-  bracket
-  (liftIO $ openUinput cfg)
-  (liftIO . closeUinput)
-  (\env -> f (BasicKeyO (runRIO env . uinputWrite) (runRIO env . uinputRepeat)))
+-- -- | Run some function in the context of an open uinput device.
+-- withUinput :: MonadUnliftIO m => UinputCfg -> (BasicKeyO -> m a) -> m a
+-- withUinput cfg f =
+--   bracket
+--   (liftIO $ openUinput cfg)
+--   (liftIO . closeUinput)
+--   (\env -> f (BasicKeyO (runRIO env . uinputWrite) (runRIO env . uinputRepeat)))
 
-instance CanOpenBasicKeyO UinputCfg where
-  withBasicKeyO = withUinput
+-- instance CanOpenBasicKeyO UinputCfg where
+--   withBasicKeyO = withUinput

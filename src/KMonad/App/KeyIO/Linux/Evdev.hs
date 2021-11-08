@@ -2,7 +2,7 @@ module KMonad.App.KeyIO.Linux.Evdev
   ( withEvdev )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Ctx
 import KMonad.Util.Logging
 import KMonad.App.KeyIO.Common

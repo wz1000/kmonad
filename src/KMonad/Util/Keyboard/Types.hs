@@ -35,7 +35,7 @@ module KMonad.Util.Keyboard.Types
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Name
 import KMonad.Util.Time
 import KMonad.Util.Keyboard.OS (Keycode, keycodeNames)

@@ -3,7 +3,7 @@
 
 module KMonad.App.Cmds where
 
-import KMonad.Prelude
+import Preface
 import KMonad.App.Logging
 import KMonad.Util.Time
 

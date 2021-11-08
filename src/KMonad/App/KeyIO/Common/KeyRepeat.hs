@@ -22,7 +22,7 @@
 module KMonad.App.KeyIO.Common.KeyRepeat where
 
 import KMonad.App.KeyIO.Common.Types
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Ctx
 import KMonad.Util.Keyboard
 import KMonad.Util.Logging

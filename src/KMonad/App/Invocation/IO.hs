@@ -4,7 +4,7 @@ module KMonad.App.Invocation.IO
 where
 
 import Data.Version
-import KMonad.Prelude
+import Preface
 import KMonad.App.Invocation.Parser
 import KMonad.App.Invocation.TH
 import KMonad.App.Types

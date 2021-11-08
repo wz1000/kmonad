@@ -1,14 +1,40 @@
-module KMonad.App.Main.Run
+module KMonad.App.Task.Run
 
 where
 
-import KMonad.Prelude
+import Preface
+import KMonad.App.Locale
 import KMonad.App.Logging
 import KMonad.App.IO
 import KMonad.App.Types
 
+import System.Keyboard
+import System.Keyboard.IO
+
+{- SECTION: types -------------------------------------------------------------}
+
+data RunEnv = RunEnv
+  { _reRunCfg    :: RunCfg
+  , _reRootEnv   :: RootEnv
+  , _reLocaleEnv :: LocaleEnv
+  , _reInputEnv      :: InputEnv
+  , _reKeyO      :: KeyO
+  }
+makeClassy ''RunEnv
+
+instance HasRunCfg    RunEnv where runCfg    = reRunCfg
+instance HasRootEnv   RunEnv where rootEnv   = reRootEnv
+instance HasLocaleEnv RunEnv where localeEnv = reLocaleEnv
+instance HasLogEnv    RunEnv where logEnv    = rootEnv.logEnv
+instance HasInputEnv      RunEnv where keyI      = reInputEnv
+instance HasKeyO      RunEnv where keyO      = reKeyO
+
+
+
 runRun :: CanRoot m env => RunCfg -> m ()
 runRun _ = atError $ log "Run!"
+
+
 
 -- import KMonad.App.KeyIO
 -- import KMonad.App.Types

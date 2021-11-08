@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-dodgy-imports #-}
 {- The very first module that gets imported, only does external imports -}
-module KMonad.Prelude.Imports
+module Preface.Imports
   ( module X )
 where
 

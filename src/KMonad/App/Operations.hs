@@ -2,7 +2,7 @@
 
 module KMonad.App.Operations where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Logging
 import KMonad.App.Types
 

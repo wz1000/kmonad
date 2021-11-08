@@ -49,7 +49,7 @@ module KMonad.Util.LayerStack
 
 where
 
-import KMonad.Prelude
+import Preface
 
 import RIO.List (delete)
 

@@ -23,7 +23,7 @@ module KMonad.Pullchain.Components.Hooks
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Logging
 
 import Data.Time.Clock.System

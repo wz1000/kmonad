@@ -8,7 +8,7 @@ module KMonad.App.KeyIO.Mac.IOKitSource
   ( withIOKitSource )
 where
 
-import KMonad.Prelude
+import Preface
 
 import Foreign.C.String
 import Foreign.Ptr

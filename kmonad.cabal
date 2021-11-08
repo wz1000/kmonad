@@ -112,10 +112,10 @@ library
       KMonad.App.Operations
       KMonad.App.Main
       KMonad.App.Main.Main
-      KMonad.App.Main.Discover
-      KMonad.App.Main.ParseTest
+      KMonad.App.Task.Discover
+      KMonad.App.Task.ParseTest
       KMonad.App.Main.OS
-      KMonad.App.Main.Run
+      KMonad.App.Task.Run
       KMonad.App.Main.Loop
       KMonad.App.Types
       KMonad.App.Invocation
@@ -143,10 +143,10 @@ library
       KMonad.Pullchain.Components.Keymap
       KMonad.Pullchain.Components.Hooks
       KMonad.Pullchain.Components.Sluice
-      KMonad.Prelude
-      KMonad.Prelude.Imports
-      KMonad.Prelude.Types
-      KMonad.Prelude.Util
+      Preface
+      Preface.Imports
+      Preface.Types
+      Preface.Util
       KMonad.Util
       KMonad.Util.Ctx
       KMonad.Util.LayerStack
@@ -154,10 +154,6 @@ library
       KMonad.Util.Logging.IO
       KMonad.Util.Logging.Operations
       KMonad.Util.Logging.Types
-      KMonad.Util.Time
-      KMonad.Util.Time.IO
-      KMonad.Util.Time.Operations
-      KMonad.Util.Time.Types
       KMonad.Util.FFI
       KMonad.Util.Keyboard
       KMonad.Util.Keyboard.Common

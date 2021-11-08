@@ -54,7 +54,7 @@ module KMonad.Pullchain.Button
   )
 where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Pullchain.Action
 import KMonad.Pullchain.Types

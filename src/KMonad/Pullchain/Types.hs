@@ -34,7 +34,7 @@ module KMonad.Pullchain.Types
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 import qualified KMonad.Util.LayerStack as Ls
 import UnliftIO.Process (CreateProcess(close_fds), createProcess_, shell)

@@ -22,7 +22,7 @@ module KMonad.Pullchain.Components.Keymap
 where
 
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Model
 import KMonad.Util

@@ -25,7 +25,7 @@ All changes and options are 1-ops. I.e. -> flag (flag thing) == flag thing
 
 module KMonad.App.Configurable where
 
-import KMonad.Prelude
+import Preface
 
 import Data.Monoid
 

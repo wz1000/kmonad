@@ -2,7 +2,7 @@ module KMonad.App.Main.Loop
 
 where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Model
 import KMonad.Util

@@ -3,7 +3,7 @@
 
 module KMonad.App.Logging where
 
-import KMonad.Prelude
+import Preface
 
 import Text.Pretty.Simple (pShow, pShowNoColor, pShowLightBg)
 import RIO.Text.Lazy (toStrict)

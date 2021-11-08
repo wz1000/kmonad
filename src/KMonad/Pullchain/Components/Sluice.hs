@@ -21,7 +21,7 @@ module KMonad.Pullchain.Components.Sluice
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 import KMonad.Util.Keyboard
 import KMonad.Util.Logging

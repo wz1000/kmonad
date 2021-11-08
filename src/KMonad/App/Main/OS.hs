@@ -3,7 +3,7 @@ module KMonad.App.Main.OS
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Ctx
 
 {- NOTE: OS-specific IO-tweaks go here

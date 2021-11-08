@@ -2,7 +2,7 @@ module KMonad.Util.Keyboard.IO
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Time
 import KMonad.Util.Keyboard.Types
 

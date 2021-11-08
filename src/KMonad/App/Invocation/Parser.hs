@@ -2,7 +2,7 @@ module KMonad.App.Invocation.Parser
   ( invocationP )
 where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.App.Configurable
 import KMonad.App.Types

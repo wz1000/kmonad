@@ -4,7 +4,7 @@ module KMonad.Pullchain.Operations
 where
 
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Model
 import KMonad.Pullchain.Button

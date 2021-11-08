@@ -2,7 +2,7 @@
 
 module KMonad.App.IO where
 
-import KMonad.Prelude
+import Preface
 
 
 import KMonad.App.Cmds
@@ -52,3 +52,4 @@ withRoot chg f = let cfg = onDef chg in
             exitFailure
 
       go `catch` oops
+

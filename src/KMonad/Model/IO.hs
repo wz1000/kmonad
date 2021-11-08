@@ -3,7 +3,7 @@ module KMonad.Model.IO
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 import KMonad.Model.Types
 

@@ -21,7 +21,7 @@ module KMonad.App.KeyIO.Windows.SendEvent
   )
 where
 
-import KMonad.Prelude
+import Preface
 
 import Foreign.Ptr
 import Foreign.Marshal hiding (void)

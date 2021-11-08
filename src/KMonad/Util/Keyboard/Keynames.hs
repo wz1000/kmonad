@@ -18,7 +18,7 @@ module KMonad.Util.Keyboard.Keynames
   )
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util.Name
 -- import KMonad.Util.Keyboard.OS
 import KMonad.Util.Keyboard.Common

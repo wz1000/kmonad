@@ -1,8 +1,8 @@
 -- |
 
-module KMonad.App.Main.ParseTest where
+module KMonad.App.Task.ParseTest where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.App.CfgFile
 import KMonad.App.IO

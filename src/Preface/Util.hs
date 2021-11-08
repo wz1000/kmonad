@@ -1,5 +1,5 @@
 {- For helpers that are so ubiquitous I want them everywhere -}
-module KMonad.Prelude.Util
+module Preface.Util
   ( u
   , ppIO
   , fi
@@ -14,16 +14,19 @@ module KMonad.Prelude.Util
   , nil
   , uncurry3
   , singleton
+
+  , showHex
   )
 where
 
-import KMonad.Prelude.Imports
-import KMonad.Prelude.Types
+import Preface.Imports
+import Preface.Types
 
 import Text.Pretty.Simple (pPrint)
 
 import qualified RIO.HashMap as M
 import qualified RIO.Set     as S
+import qualified Numeric     as N (showHex)
 
 --------------------------------------------------------------------------------
 -- $uncategorized
@@ -92,3 +95,7 @@ uncurry3 f (a, b, c) = f a b c
 
 singleton :: a -> [a]
 singleton = (:[])
+
+-- | Show an integral as the hex-string that would construct it.
+showHex :: (Integral a, Show a) => a -> String
+showHex = ("0x" <>) . ($ "") . N.showHex

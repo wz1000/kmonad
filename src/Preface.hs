@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-dodgy-imports #-}
 {-|
-Module      : KMonad.Prelude
+Module      : Preface
 Description : Code that will be imported into every module
 Copyright   : (c) David Janssen, 2019
 License     : MIT
@@ -10,8 +10,9 @@ Stability   : experimental
 Portability : non-portable (MPTC with FD, FFI to Linux-only c-code)
 -}
 
-module KMonad.Prelude ( module X ) where
+module Preface ( module X ) where
 
-import KMonad.Prelude.Imports as X
-import KMonad.Prelude.Types   as X
-import KMonad.Prelude.Util    as X
+import Preface.Imports as X
+import Preface.Types   as X
+import Preface.Time    as X
+import Preface.Util    as X

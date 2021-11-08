@@ -15,7 +15,7 @@ module KMonad.Util.Logging.Types
 where
 
 
-import KMonad.Prelude
+import Preface
 import RIO (LogLevel(..))
 import qualified RIO.Text as T
 

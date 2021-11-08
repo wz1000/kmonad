@@ -3,7 +3,7 @@ module KMonad.Util.OS
 
 where
 
-import KMonad.Prelude
+import Preface
 
 -- Utilities for managing cross-platform support
 

@@ -10,7 +10,7 @@ module KMonad.Util.Logging.IO
   )
 where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.Util.Ctx
 import KMonad.Util.Logging.Types

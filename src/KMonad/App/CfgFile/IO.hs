@@ -2,7 +2,7 @@
 
 module KMonad.App.CfgFile.IO where
 
-import KMonad.Prelude
+import Preface
 
 import KMonad.App.Configurable
 import KMonad.App.Logging

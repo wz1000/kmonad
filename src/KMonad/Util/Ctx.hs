@@ -12,7 +12,7 @@ module KMonad.Util.Ctx
   )
 where
 
-import KMonad.Prelude
+import Preface
 
 import Control.Monad.Cont
 import UnliftIO.Async (wait)

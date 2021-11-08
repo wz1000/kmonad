@@ -3,7 +3,7 @@ module KMonad.Util.Name
 
 where
 
-import KMonad.Prelude
+import Preface
 
 import Data.Char (toUpper)
 import qualified RIO.HashMap as M

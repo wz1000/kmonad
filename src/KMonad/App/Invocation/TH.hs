@@ -12,7 +12,7 @@ Portability : non-portable (TH)
 -}
 module KMonad.App.Invocation.TH (gitHash) where
 
-import KMonad.Prelude
+import Preface
 
 import Language.Haskell.TH (Exp, Q)
 import Language.Haskell.TH.Syntax (runIO)

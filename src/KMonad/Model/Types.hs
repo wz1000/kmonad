@@ -2,7 +2,7 @@ module KMonad.Model.Types
 
 where
 
-import KMonad.Prelude
+import Preface
 import KMonad.Util
 
 import UnliftIO.STM

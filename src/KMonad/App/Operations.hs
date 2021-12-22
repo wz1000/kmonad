@@ -6,7 +6,6 @@ import Preface
 import KMonad.Util.Logging
 import KMonad.App.Types
 
-import System.Keyboard.IO
 
 {- NOTE: Should this live here? Maybe in App.IO?
 

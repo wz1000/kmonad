@@ -16,7 +16,7 @@ module Main
 where
 
 import Prelude (IO)
-import qualified KMonad.App as KMonad (main)
+import qualified Edifice.Main as E (main)
 
 main :: IO ()
-main = KMonad.main
+main = E.main

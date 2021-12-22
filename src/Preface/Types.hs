@@ -3,20 +3,56 @@
 module Preface.Types
   ( Default(..)
 
+  , Name
+  , HasName(..)
+  , Named
+  , Description
+  , HasDescription(..)
+
+  , CfgFile
+
   -- * Shorthand
   , OnlyIO, IO, UIO, EnvIO, EnvUIO
   )
 where
 
-import Preface.Imports
+import Preface.External
 import qualified RIO as R
+import qualified RIO.HashMap as M
 
 --------------------------------------------------------------------------------
 
 instance Display Natural where textDisplay = tshow
 
---------------------------------------------------------------------------------
--- $shorthand
+{- SECTION: Informative text aliases ------------------------------------------}
+
+-- | A name for some thing
+--
+-- Note that, internally, names are subject to being compared. It is up to the
+-- programmer to ensure that names are meaningful and comparable.
+type Name = Text
+
+class HasName a where name :: Lens' a Name
+
+instance HasName Name where name = id
+
+-- | A map of names to things
+type Named a = M.HashMap Name a
+
+-- | A description of some thing
+--
+-- Note that, internally, descriptions are only ever going to be displayed, and
+-- not compared or searched or set.
+type Description = Text
+
+class HasDescription a where description :: Getter a Description
+
+instance HasDescription Description where description = id
+
+-- | A type indicating a FilePath that is expected to follow some cfg syntax
+type CfgFile = FilePath
+
+{- SECTION: Type shorthand ----------------------------------------------------}
 
 -- | Type we use instead of 'IO'
 --

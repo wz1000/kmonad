@@ -14,8 +14,8 @@ import KMonad.App.Types
 
 import KMonad.Util.Ctx
 
-import System.Keyboard
-import System.Keyboard.IO
+import Keyboard
+-- import System.Keyboard.IO
 
 import Text.RawString.QQ
 

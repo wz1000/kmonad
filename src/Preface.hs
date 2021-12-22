@@ -12,7 +12,6 @@ Portability : non-portable (MPTC with FD, FFI to Linux-only c-code)
 
 module Preface ( module X ) where
 
-import Preface.Imports as X
+import Preface.External as X
 import Preface.Types   as X
-import Preface.Time    as X
 import Preface.Util    as X

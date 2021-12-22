@@ -8,8 +8,8 @@ import KMonad.App.Logging
 import KMonad.App.IO
 import KMonad.App.Types
 
-import System.Keyboard
-import System.Keyboard.IO
+import Keyboard
+-- import System.Keyboard.IO
 
 {- SECTION: types -------------------------------------------------------------}
 

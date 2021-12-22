@@ -30,6 +30,7 @@ flag dext
 -- Properties shared between library and test-suite
 common shared-props
   default-extensions:
+      BlockArguments
       ConstraintKinds
       DeriveFunctor
       DeriveGeneric
@@ -83,88 +84,115 @@ library
       -- library feature, but it gives `stack repl` some serious hiccups and makes
       -- the dev-process a headache. Should factor this out to its own proper
       -- project at some point.
-      System.Keyboard.Operations
-      System.Keyboard.Prelude
-      System.Keyboard.Types
-      System.Keyboard.IO.Evdev
-      System.Keyboard.IO.Uinput
-      System.Keyboard.IO.General
-      System.Keyboard.Util.FFI
-      System.Keyboard.EnUS
+      -- System.Keyboard.Operations
+      -- System.Keyboard.Prelude
+      -- System.Keyboard.Types
+      -- System.Keyboard.IO.Evdev
+      -- System.Keyboard.IO.Uinput
+      -- System.Keyboard.IO.General
+      -- System.Keyboard.Util.FFI
+      -- System.Keyboard.EnUS
       -- /end-of-module
 
   exposed-modules:
-      -- Like above, but exposed
-      System.Keyboard
-      System.Keyboard.IO
-      -- /end-of-module
-
-      KMonad.App
-      KMonad.App.CfgFile
-      KMonad.App.CfgFile.Grokker
-      KMonad.App.CfgFile.IO
-      KMonad.App.CfgFile.Tokenizer
-      KMonad.App.Cmds
-      KMonad.App.IO
-      KMonad.App.Configurable
-      KMonad.App.Locale
-      KMonad.App.Logging
-      KMonad.App.Operations
-      KMonad.App.Main
-      KMonad.App.Main.Main
-      KMonad.App.Task.Discover
-      KMonad.App.Task.ParseTest
-      KMonad.App.Main.OS
-      KMonad.App.Task.Run
-      KMonad.App.Main.Loop
-      KMonad.App.Types
-      KMonad.App.Invocation
-      KMonad.App.Invocation.IO
-      KMonad.App.Invocation.Operations
-      KMonad.App.Invocation.Parser
-      KMonad.App.Invocation.TH
-      KMonad.App.KeyIO
-      KMonad.App.KeyIO.Common
-      KMonad.App.KeyIO.Common.KeyRepeat
-      KMonad.App.KeyIO.Common.Types
-      KMonad.App.KeyIO.OS
-      KMonad.Model
-      KMonad.Model.Types
-      KMonad.Model.IO
-      KMonad.Pullchain
-      KMonad.Pullchain.Action
-      KMonad.Pullchain.Button
-      KMonad.Pullchain.Env
-      KMonad.Pullchain.IO
-      KMonad.Pullchain.Loop
-      KMonad.Pullchain.Operations
-      KMonad.Pullchain.Types
-      KMonad.Pullchain.Components.Dispatch
-      KMonad.Pullchain.Components.Keymap
-      KMonad.Pullchain.Components.Hooks
-      KMonad.Pullchain.Components.Sluice
       Preface
-      Preface.Imports
+      Preface.External
       Preface.Types
       Preface.Util
-      KMonad.Util
-      KMonad.Util.Ctx
-      KMonad.Util.LayerStack
-      KMonad.Util.Logging
-      KMonad.Util.Logging.IO
-      KMonad.Util.Logging.Operations
-      KMonad.Util.Logging.Types
-      KMonad.Util.FFI
-      KMonad.Util.Keyboard
-      KMonad.Util.Keyboard.Common
-      KMonad.Util.Keyboard.Compose
-      KMonad.Util.Keyboard.IO
-      KMonad.Util.Keyboard.OS
-      KMonad.Util.Keyboard.Operations
-      KMonad.Util.Keyboard.Keynames
-      KMonad.Util.Keyboard.Types
-      KMonad.Util.Name
-      KMonad.Util.OS
+
+      Art
+      Art.Cmds
+      Art.KeyI
+      Art.KeyO
+      Art.Locale
+      Art.Logging
+
+      Edifice.Main
+      Edifice.Invoc
+      Edifice.Invoc.TH
+      Edifice.Invoc.Types
+
+      Edifice.Ctx
+      Edifice.Ctx.Discover
+      Edifice.Ctx.ParseTest
+      Edifice.Ctx.Run
+      Edifice.Ctx.Types
+
+      Keyboard
+      Keyboard.Types
+      Keyboard.Types.Linux
+
+      Util
+      Util.Configurable
+      Util.Ctx
+      Util.Time
+      -- Like above, but exposed
+      -- System.Keyboard
+      -- System.Keyboard.IO
+      -- /end-of-module
+
+      -- KMonad.App
+      -- KMonad.App.CfgFile
+      -- KMonad.App.CfgFile.Grokker
+      -- KMonad.App.CfgFile.IO
+      -- KMonad.App.CfgFile.Tokenizer
+      -- KMonad.App.Cmds
+      -- KMonad.App.IO
+      -- KMonad.App.Configurable
+      -- KMonad.App.Locale
+      -- KMonad.App.Logging
+      -- KMonad.App.Operations
+      -- KMonad.App.Main
+      -- KMonad.App.Main.Main
+      -- KMonad.App.Task.Discover
+      -- KMonad.App.Task.ParseTest
+      -- KMonad.App.Main.OS
+      -- KMonad.App.Task.Run
+      -- KMonad.App.Main.Loop
+      -- KMonad.App.Types
+      -- KMonad.App.Invocation
+      -- KMonad.App.Invocation.IO
+      -- KMonad.App.Invocation.Operations
+      -- KMonad.App.Invocation.Parser
+      -- KMonad.App.Invocation.TH
+      -- KMonad.App.KeyIO
+      -- KMonad.App.KeyIO.Common
+      -- KMonad.App.KeyIO.Common.KeyRepeat
+      -- KMonad.App.KeyIO.Common.Types
+      -- KMonad.App.KeyIO.OS
+      -- KMonad.Model
+      -- KMonad.Model.Types
+      -- KMonad.Model.IO
+      -- KMonad.Pullchain
+      -- KMonad.Pullchain.Action
+      -- KMonad.Pullchain.Button
+      -- KMonad.Pullchain.Env
+      -- KMonad.Pullchain.IO
+      -- KMonad.Pullchain.Loop
+      -- KMonad.Pullchain.Operations
+      -- KMonad.Pullchain.Types
+      -- KMonad.Pullchain.Components.Dispatch
+      -- KMonad.Pullchain.Components.Keymap
+      -- KMonad.Pullchain.Components.Hooks
+      -- KMonad.Pullchain.Components.Sluice
+      -- KMonad.Util
+      -- KMonad.Util.Ctx
+      -- KMonad.Util.LayerStack
+      -- KMonad.Util.Logging
+      -- KMonad.Util.Logging.IO
+      -- KMonad.Util.Logging.Operations
+      -- KMonad.Util.Logging.Types
+      -- KMonad.Util.FFI
+      -- KMonad.Util.Keyboard
+      -- KMonad.Util.Keyboard.Common
+      -- KMonad.Util.Keyboard.Compose
+      -- KMonad.Util.Keyboard.IO
+      -- KMonad.Util.Keyboard.OS
+      -- KMonad.Util.Keyboard.Operations
+      -- KMonad.Util.Keyboard.Keynames
+      -- KMonad.Util.Keyboard.Types
+      -- KMonad.Util.Name
+      -- KMonad.Util.OS
 
       -- TODO: Why do we need to import this autogenerated file?
       Paths_kmonad
@@ -172,11 +200,11 @@ library
   -- Linux block
   if os(linux)
     exposed-modules:
-      KMonad.App.KeyIO.Linux
-      KMonad.App.KeyIO.Linux.Evdev
-      KMonad.App.KeyIO.Linux.IO
-      KMonad.App.KeyIO.Linux.Uinput
-      KMonad.Util.Keyboard.Linux
+      -- KMonad.App.KeyIO.Linux
+      -- KMonad.App.KeyIO.Linux.Evdev
+      -- KMonad.App.KeyIO.Linux.IO
+      -- KMonad.App.KeyIO.Linux.Uinput
+      -- KMonad.Util.Keyboard.Linux
     c-sources:
       c_src/keyio.c
     build-depends:

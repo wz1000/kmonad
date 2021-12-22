@@ -1,0 +1,26 @@
+
+Welcome to the article on KMonad's edifice.
+
+At the moment, the edifice lies in shambles. I set out on an adventure to
+refactor the keycodes, which called for a refactoring of the app-environment,
+which called for the refactoring of the parser, which called for a refactoring
+of the invocation. I've taken everything apart, and the pieces are lying strewn
+around me, and I am having trouble putting them back together.
+
+I find my ability to focus comes in waves, and I am not sure whether this is a
+symptom of my illness, or just a general pattern of my productivity. Perhaps
+this question is not pertinent. I mention it here, only because I wish to
+illustrate that up until about 2 weeks ago, progress was fast. However, for a
+while now I have found myself brain foggy and unable to focus.
+
+I am now starting at the `Edifice.Main` module, and I'm not sure where to begin.
+I've kept telling myself that after I finish refactoring KMonad, I would write
+some articles about its design and implementation, both to facilitate
+contribution as an illustration of how one could structure a mid-sized Haskell
+app (there are lots of tutorials on the basics, and on fun little tricks, but
+practical, holistic design documents I have not really come across).
+
+Now that I find myself staring at the metaphorical empty page (or actually: a
+writer's room full of notes and crumpled up pieces of paper), I decided: maybe
+the right place to start is with the documentation. At least I can get my
+thoughts down and sorted before I try to code another dead-end attempt.

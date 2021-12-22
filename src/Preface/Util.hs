@@ -3,6 +3,7 @@ module Preface.Util
   ( u
   , ppIO
   , fi
+  , _fi
   , inEnv
   , overMVar
   , reverseMap
@@ -16,10 +17,16 @@ module Preface.Util
   , singleton
 
   , showHex
+
+  , ReturnCode
+  , onNonZero
+  , onNonZeroThrow
+
+  , byName
   )
 where
 
-import Preface.Imports
+import Preface.External
 import Preface.Types
 
 import Text.Pretty.Simple (pPrint)
@@ -43,6 +50,10 @@ ppIO = pPrint
 -- | Shorthand for fromIntegral
 fi :: (Integral a, Num b) => a -> b
 fi = fromIntegral
+
+-- | Shorthand for fromIntegral in lens form
+_fi :: (Integral a, Num b) => Getter a b
+_fi = to fromIntegral
 
 -- | Makes some of the continuation formulations cleaner to write
 inEnv :: IO m => RIO env a -> env -> m a
@@ -99,3 +110,36 @@ singleton = (:[])
 -- | Show an integral as the hex-string that would construct it.
 showHex :: (Integral a, Show a) => a -> String
 showHex = ("0x" <>) . ($ "") . N.showHex
+
+--------------------------------------------------------------------------------
+
+type ReturnCode = Int
+
+-- | Helper function to throw some haskell-error when an FFI call returns non-zero.
+--
+-- >>> ffiCall `onNonZero` \n -> throwing _Nope ("The snozzle did not jig the glorp", n)
+--
+onNonZero :: (Monad m, Integral i)
+  => m i
+  -> (ReturnCode -> m ())
+  -> m ()
+onNonZero a f = a >>= \case
+  0 -> pure ()
+  n -> f . fi $ n
+
+-- | Helper function to throw some error on non-zero
+--
+-- >>> ffiCall `onNonZeroThrow` _Nope "The snozzle did not jig the glorp"
+--
+onNonZeroThrow :: (Monad m, Integral i)
+  => m i
+  -> (AReview SomeException (a, ReturnCode), a)
+  -> m ()
+onNonZeroThrow a (p, b) = a >>= \case
+  0 -> pure ()
+  n -> throwing p (b, fi n)
+
+--------------------------------------------------------------------------------
+
+byName :: HasName a => [a] -> Named a
+byName = M.fromList . map (view name &&& id)

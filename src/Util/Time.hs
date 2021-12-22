@@ -1,6 +1,6 @@
 -- | A small collection of time utilities
 
-module Preface.Time
+module Util.Time
   ( Time
   , HasTime(..)
   , Ms
@@ -15,9 +15,7 @@ module Preface.Time
 
 where
 
-import Preface.Imports
-import Preface.Types
-import Preface.Util
+import Preface
 
 import Data.Time.Clock.System
 

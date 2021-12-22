@@ -1,10 +1,11 @@
+
 {-# LANGUAGE DeriveAnyClass #-}
+module Art.Cmds where
+
 -- |
 
-module KMonad.App.Cmds where
-
-import Preface
-import KMonad.App.Logging
+import Util
+import Art.Logging
 
 import UnliftIO.Process
 import qualified RIO.HashMap as M

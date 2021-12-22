@@ -1,0 +1,30 @@
+
+So, the edifice consists of a number of nesting runtime environments which we
+will refer to as contexts (Ctx). Some Ctx will only be able to be opened in the
+context of another Ctx already being open. I.e. the error-printer needs logging.
+We try to group the contexts logically.
+
+Note that we make a distinction between Ctx, which is a very kmonad specific RIO
+environment, and Art, which is a general 'flavor' of capabilities that I might
+want to copy over to some other app. For example: the runtime environment for
+the parse-test task is very kmonad specific, and is therefore a 'Ctx'. Logging,
+however, is written kmonad agnostically, and is therefore an 'Art'. We keep
+'Art' outside of the edifice now.
+
+Here are the first few Ctx in order:
+
+1. IO, emptiness, nothing
+2. We get invoked, and carry the invocation around forever
+3. Using invoc, we initialize logging, and keep hold of the log-env
+4. Using logging, we open the outer error printer
+
+After this, the env will depend on the task, so everything before this always
+happens, and therefore we collapse it semantically into 1 context, the: Dais.
+
+The Dais therefore contains:
+- The invoc
+- The logenv
+- An error-printing catcher
+
+
+Then it depends on the task:

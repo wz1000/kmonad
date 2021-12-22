@@ -1,12 +1,11 @@
 -- |
 
-module KMonad.App.CfgFile.Grokker where
+module Edifice.CfgFile.Grokker where
 
-import Preface
+import Util
 
-import KMonad.App.Configurable
-import KMonad.App.CfgFile.Tokenizer
-import KMonad.App.Types
+import Edifice.Types
+import Edifice.CfgFile.Tokenizer
 
 import Keyboard -- FIXME: delete when done
 -- import KMonad.App.Parser.Test -- FIXME: Remove when done

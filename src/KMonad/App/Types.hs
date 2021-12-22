@@ -12,12 +12,11 @@ where
 
 import Preface
 
-import KMonad.Util.Time
 import KMonad.App.Cmds
 import KMonad.App.Locale
 import KMonad.App.Logging
 
-import System.Keyboard
+import Keyboard
 
 import UnliftIO.Directory
 import qualified RIO.Text as T
@@ -48,14 +47,6 @@ NOTE: we import input and output configuration types from System.Keyboard.
 
 {- SUBSECTION: model ----------------------------------------------------------}
 
--- | Config options pertinent to running a KMonad model
-data ModelCfg = ModelCfg
-  { _fallthrough :: Bool   -- ^ Whether to rethrow uncaught key events
-  , _macroDelay  :: Ms     -- ^ How long to pause between macro-taps
-  } deriving (Eq, Show)
-makeClassy ''ModelCfg
-
-instance Default ModelCfg where def = ModelCfg True 10
 
 
 {- SECTION: task configs ------------------------------------------------------}
@@ -74,13 +65,6 @@ data RunCfg = RunCfg
   , _rOutputCfg :: OutputCfg -- ^ Cfg how to generate output
   } deriving (Eq, Show)
 makeClassy ''RunCfg
-
-instance Default RunCfg where def = RunCfg def def def def
-
-instance HasModelCfg  RunCfg where modelCfg  = rModelCfg
-instance HasInputCfg  RunCfg where inputCfg  = rInputCfg
-instance HasLocaleCfg RunCfg where localeCfg = rLocaleCfg
-instance HasOutputCfg RunCfg where outputCfg = rOutputCfg
 
 -- | Config describing how to run @kmonad discover@
 data DiscoverCfg = DiscoverCfg
@@ -154,19 +138,6 @@ data RootCfg = RootCfg
   , _cfgFile  :: Maybe FilePath -- ^ Where to look for a config file
   } deriving (Eq, Show)
 makeClassy ''RootCfg
-
-instance Default RootCfg where
-  def = RootCfg
-    { _rLogCfg  = def
-    , _rCmdsCfg = def
-    , _bcTask   = def
-    , _cmdAllow = False
-    , _cfgFile  = Nothing
-    }
-
-instance HasLogCfg  RootCfg where logCfg  = rLogCfg
-instance HasCmdsCfg RootCfg where cmdsCfg = rCmdsCfg
-instance HasTask RootCfg where task = bcTask
 
 
 

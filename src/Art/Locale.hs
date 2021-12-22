@@ -1,11 +1,7 @@
--- |
-
-module KMonad.App.Locale where
-
-import Preface
-import KMonad.Util.Ctx
+module Art.Locale where
 
 import Keyboard
+import Util
 
 import RIO.Partial (fromJust)
 import qualified RIO.HashMap as M

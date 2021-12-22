@@ -38,13 +38,13 @@ import KMonad.Util.Name
 import KMonad.Util.Time
 
 import Options.Applicative (ReadM, eitherReader)
-import System.Keyboard hiding (Name, Description)
+import Keyboard hiding (Name, Description)
 
 {- SECTION: Types -------------------------------------------------------------}
 
 -- FIXME: this shouldn't live here
 type Description = Text
-class HasDescription a where description :: Lens' a Description
+class HasDescription a where description :: Getter a Description
 
 -- | An iso between a monoidal foldable thing and that thing wrapped in a Just
 -- if it isn't empty, or Nothing if it is.

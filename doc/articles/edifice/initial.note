@@ -1,0 +1,49 @@
+-- < ./intro
+
+So: what do I want the edifice to look like?
+
+Well, there are a few different capacities to KMonad. Some always occur, others
+occur depending on the task, some overlap, others do not. How about I list them
+out first:
+
+> -- org
+
+braindump:
+
+Well, there is the initial stage that always happens:
+1. Parse the invocation
+2. Open the logging context
+3. Open the command-running context
+
+After that, we dispatch on 1 of currently 3 (already maybe 5) tasks:
+1. Do a parse-test
+2. Run a model
+3. Run a discover session
+4. print input keyboard
+5. emit to output keyboard
+
+For those tasks we also need to:
+
+| capacity                    | required for task | notes                               |
+|-----------------------------+-------------------+-------------------------------------|
+| grab an input keyboard      |                23 |                                     |
+| simulate an output keyboard |                25 |                                     |
+| read a config file          |             12345 | 345 only optionally                 |
+| map keycodes to keynames    |             12345 | 145 only optionally, default exists |
+
+question: What is the right trade off between flexibility and simplicity?
+
+question: What is the next step?
+
+setup:
+- ctxBase: all stuff before we dispatch on Task
+- ctxDiscover: run a discover task
+
+get that running, make sure you support:
+- locales
+- reading settings from the cfg file
+- keep logging and locale separate arts, but merge them into Base ctx
+
+then:
+- add ctxRun
+- add ctxCheckCfg

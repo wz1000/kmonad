@@ -1,13 +1,10 @@
-{-# LANGUAGE QuasiQuotes #-}
 -- |
-module KMonad.App.CfgFile.Tokenizer where
 
+{-# LANGUAGE QuasiQuotes #-}
+module Edifice.CfgFile.Tokenizer where
 
 import Util hiding (try)
 
-import KMonad.App.Configurable
-import KMonad.Util.Name
-import KMonad.Util.Time
 import Keyboard
 
 -- import KMonad.App.Parser.Test -- FIXME: Remove when done
@@ -51,7 +48,8 @@ Here we:
 
 -}
 
-
+allFlags = M.empty
+allOptions = M.empty
 
 {- SECTION: types -------------------------------------------------------------}
 
@@ -183,8 +181,8 @@ pairs :: P a -> P b -> P [(a, b)]
 pairs a b = many $ (,) <$> a <*> b
 
 -- | Match at least 1 of legal keyname characters
-keyname :: P Keyname
-keyname = word
+keyname_ :: P Keyname
+keyname_ = word
 
 -- | Match a variety of word-terminators
 terminator :: P ()
@@ -294,7 +292,7 @@ kcfg = KCfg <$> many ksetting
 
 -- | Parse a defsrc block by:
 ksrc :: P KBlock
-ksrc = KSrc <$> some keyname
+ksrc = KSrc <$> some keyname_
 
 -- | Parse a defalias block by:
 kals :: P KBlock

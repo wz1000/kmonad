@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -Wno-dodgy-imports #-}
 {- The very first module that gets imported, only does external imports -}
-module Preface.Imports
+module Preface.External
   ( module X )
 where
 
@@ -14,6 +14,9 @@ import Control.Lens as X hiding
 
 import Control.Monad.Cont      as X
 import Data.Default            as X
+import Data.Hashable           as X (Hashable(..))
+import Foreign.C.String        as X
+import Foreign.C.Types         as X
 import RIO.Text                as X (unlines, lines, unpack, pack)
 import RIO.FilePath            as X ((</>))
 import Text.Pretty.Simple      as X (pShow)

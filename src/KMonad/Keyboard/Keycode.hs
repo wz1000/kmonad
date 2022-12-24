@@ -405,6 +405,7 @@ aliases = Q.mkMultiMap
   , (KeySysRq,          ["ssrq", "sys"])
   , (KeyKbdIllumDown,   ["bldn"])
   , (KeyKbdIllumUp,     ["blup"])
+  , (KeyKbdIllumToggle, ["blto"])
   , (KeyNextSong,       ["next"])
   , (KeyPlayPause,      ["pp"])
   , (KeyPreviousSong,   ["prev"])
